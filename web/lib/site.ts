@@ -9,3 +9,12 @@
 export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL?.trim() || "";
 
 export const hasRepo = REPO_URL.length > 0;
+
+/**
+ * Absolute origin, needed so social preview images resolve. Vercel supplies
+ * VERCEL_URL automatically; set NEXT_PUBLIC_SITE_URL to override with a custom
+ * domain.
+ */
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");

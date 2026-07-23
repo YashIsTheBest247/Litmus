@@ -22,12 +22,12 @@ import subprocess
 import time
 from pathlib import Path
 
-from .agents import REVIEW_PROMPT, SYSTEM_PROMPT, AgentOutcome, _current_patch
+from .agents import NEUTRAL_PROMPT, PROMPTS, REVIEW_PROMPT, AgentOutcome, _current_patch
 from .models import TaskPack
 from .sandbox import Sandbox
 
 CODEX_TIMEOUT_S = 420
-CONFIGS = {"iterative", "reviewed"}
+CONFIGS = {"iterative", "reviewed", "pressured", "guided"}
 
 
 class CodexUnavailable(RuntimeError):
@@ -49,11 +49,15 @@ def codex_command() -> list[str]:
 
 
 def _count_turns(jsonl: str) -> int:
-    """Approximate agent turns from the event stream.
+    """Count agent actions from the event stream.
 
-    Codex emits JSONL events; we count the ones that represent the model
-    acting, which is the closest analogue to a turn in the API providers.
+    Codex emits `thread.started`, `turn.started`, `item.started`,
+    `item.completed`, `turn.completed`. One `codex exec` is a single `turn`
+    however much work happens inside it, so counting turns would always report
+    1 and say nothing. `item.completed` is the closer analogue to a turn in the
+    API providers: one model action - a message, a command, a patch.
     """
+    items = 0
     turns = 0
     for line in jsonl.splitlines():
         line = line.strip()
@@ -63,10 +67,12 @@ def _count_turns(jsonl: str) -> int:
             event = json.loads(line)
         except json.JSONDecodeError:
             continue
-        kind = str(event.get("type") or event.get("msg", {}).get("type") or "")
-        if any(marker in kind for marker in ("agent_message", "exec_command", "patch_apply")):
+        kind = str(event.get("type", ""))
+        if kind == "item.completed":
+            items += 1
+        elif kind == "turn.completed":
             turns += 1
-    return turns
+    return items or turns
 
 
 class CodexCliAgent:
@@ -89,6 +95,8 @@ class CodexCliAgent:
                 f"codex:{config} is not available. The CLI always runs its own tool "
                 f"loop, so there is no honest 'oneshot' mode. Use one of {sorted(CONFIGS)}."
             )
+        # `reviewed` is the neutral brief plus a self-critique pass; the others
+        # differ only in how the task is framed.
         self.config = config
         self.model = model or ""
         self.timeout_s = timeout_s
@@ -126,7 +134,7 @@ class CodexCliAgent:
     def _brief(self, sandbox: Sandbox, pack: TaskPack) -> str:
         listing = "\n".join(f"- {f}" for f in sandbox.list_files())
         return (
-            f"{SYSTEM_PROMPT}\n\n"
+            f"{PROMPTS.get(self.config, NEUTRAL_PROMPT)}\n\n"
             f"# Bug report\n\n{pack.bug_report}\n\n"
             f"# Files in the workspace\n{listing}\n\n"
             f"The entry point is {pack.entrypoint}. Run tests_public.py with pytest to "

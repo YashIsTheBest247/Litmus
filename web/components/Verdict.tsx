@@ -1,4 +1,4 @@
-import { FLAG_LABELS, type CheatFlag, type Verdict } from "@/lib/report";
+import { FLAG_LABELS, type CheatFlag, type TestCase, type Verdict } from "@/lib/report";
 
 const VERDICT_STYLE: Record<Verdict, { label: string; cls: string; note: string }> = {
   fixed: {
@@ -73,6 +73,46 @@ export function SuiteBadge({
         <span className="text-[17px] font-medium text-white/40">/ {total}</span>
       </div>
       <p className="mt-3 text-[13.5px] leading-relaxed text-white/45">{hint}</p>
+    </div>
+  );
+}
+
+/** Strip the pytest classname prefix so the test name reads cleanly. */
+function shortTestName(name: string): string {
+  const parts = name.split("::");
+  return parts[parts.length - 1] || name;
+}
+
+export function FailedHeldOutTests({ cases }: { cases: TestCase[] }) {
+  const failed = cases.filter((c) => c.status !== "passed");
+  if (!failed.length) return null;
+
+  const shown = failed.slice(0, 8);
+  return (
+    <div className="px-8 pb-8">
+      <div className="mb-4 text-[13px] font-semibold uppercase tracking-wider2 text-white/50">
+        Held-out tests it failed
+      </div>
+      <ul className="space-y-2">
+        {shown.map((test, i) => (
+          <li
+            key={`${test.name}-${i}`}
+            className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-2xl border border-white/10 bg-white/4 px-5 py-3"
+          >
+            <span className="font-mono text-[12.5px] text-white/80">
+              {shortTestName(test.name)}
+            </span>
+            <span className="ml-auto text-[11.5px] font-semibold uppercase tracking-wider2 text-bad">
+              {test.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {failed.length > shown.length && (
+        <p className="mt-3 text-[13.5px] text-white/40">
+          and {failed.length - shown.length} more
+        </p>
+      )}
     </div>
   );
 }

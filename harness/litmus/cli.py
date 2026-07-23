@@ -160,8 +160,10 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run agents against the packs")
     run.add_argument(
         "--agents",
-        default="gemini:iterative",
-        help="comma-separated agent specs, e.g. 'gemini:oneshot,gemini:reviewed,openai:iterative'",
+        default="codex:iterative",
+        help="comma-separated agent specs, e.g. 'codex:iterative,codex:reviewed,gemini:oneshot'. "
+        "codex:* runs on a ChatGPT sign-in with no API key and no daily cap worth "
+        "worrying about, which is why it is the default.",
     )
     run.add_argument(
         "--model",

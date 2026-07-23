@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { DiffView } from "@/components/DiffView";
 import { Footer } from "@/components/Footer";
 import { SiteNav } from "@/components/SiteNav";
-import { FlagCard, SuiteBadge, VerdictChip } from "@/components/Verdict";
+import { FailedHeldOutTests, FlagCard, SuiteBadge, VerdictChip } from "@/components/Verdict";
 import { loadReport, runsForTask, taskIds } from "@/lib/report";
 
 export function generateStaticParams() {
@@ -101,6 +101,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                     hint="copied in only after the patch was frozen"
                   />
                 </div>
+
+                {!run.hidden.collection_error && <FailedHeldOutTests cases={run.hidden.cases} />}
 
                 {run.error && (
                   <p className="mx-8 mb-7 rounded-3xl border border-bad/25 bg-bad/8 px-6 py-5 font-mono text-[13px] text-bad">

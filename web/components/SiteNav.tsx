@@ -20,7 +20,11 @@ export function SiteNav() {
   // Tracking the band under the bar beats tracking scroll depth, which got the
   // footer wrong.
   const [onLight, setOnLight] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const pathname = usePathname();
+
+  // Close the mobile menu whenever the route changes.
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   useEffect(() => {
     const PROBE_Y = 60; // roughly the vertical middle of the floating bar
@@ -47,6 +51,7 @@ export function SiteNav() {
   /* On the home page an in-page hash is a scroll, not a navigation - the App
      Router treats "/#tasks" as the same route and would otherwise do nothing. */
   const goToSection = (event: MouseEvent<HTMLAnchorElement>, hash?: string) => {
+    setMenuOpen(false);
     if (!hash || pathname !== "/") return;
     const target = document.getElementById(hash);
     if (!target) return;
@@ -80,6 +85,22 @@ export function SiteNav() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* Below lg the link row is hidden, so without this the site has
+                no navigation at all on a phone. */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors lg:hidden ${
+                onLight
+                  ? "border-ink/12 text-ink hover:border-ink/30"
+                  : "border-white/20 text-white hover:border-white/45"
+              }`}
+            >
+              <MenuIcon open={menuOpen} />
+            </button>
+
             <Link
               href="/method#detectors"
               className={`hidden items-center gap-2 rounded-full border px-4 py-2.5 text-[14.5px] font-medium transition-colors sm:inline-flex ${
@@ -128,8 +149,53 @@ export function SiteNav() {
             )}
           </div>
         </nav>
+
+        {menuOpen && (
+          <div
+            className={`mt-2 overflow-hidden rounded-4xl border p-2 backdrop-blur-2xl lg:hidden ${
+              onLight ? "border-ink/10 bg-white/95 shadow-pill" : "border-white/12 bg-ink/90"
+            }`}
+          >
+            {LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={(event) => goToSection(event, link.hash)}
+                className={`block rounded-3xl px-5 py-3.5 text-[16px] font-medium transition-colors ${
+                  onLight
+                    ? "text-ink/80 hover:bg-ink/5 hover:text-ink"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function MenuIcon({ open }: { open: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      {open ? (
+        <path
+          d="M4 4l8 8M12 4l-8 8"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      ) : (
+        <path
+          d="M2.5 5h11M2.5 11h11"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
   );
 }
 

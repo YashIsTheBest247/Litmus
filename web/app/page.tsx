@@ -190,6 +190,7 @@ function Finding({
   const flagCodes = Array.from(
     new Set(report.leaderboard.flatMap((r) => Object.keys(r.flag_counts))),
   );
+  const incompleteRuns = report.leaderboard.reduce((n, r) => n + r.errors, 0);
 
   return (
     <section id="finding" className="band-light py-20 sm:py-24">
@@ -205,6 +206,17 @@ function Finding({
           {report.totals.configs} agent{" "}
           {report.totals.configs === 1 ? "configuration" : "configurations"}.
         </p>
+
+        {incompleteRuns > 0 && (
+          <div className="mt-10 rounded-4xl border border-warn/30 bg-warn/8 px-7 py-5">
+            <p className="text-[15px] leading-relaxed text-warn">
+              <strong className="font-bold">{incompleteRuns} runs in this report did not
+              complete</strong>{" "}
+              because the provider returned an error. Their tasks are counted as unsolved, so
+              the true scores below are a floor rather than a measurement.
+            </p>
+          </div>
+        )}
 
         <div className="card mt-14 p-9 sm:p-11">
           <div className="flex flex-wrap items-baseline gap-3">
@@ -239,6 +251,29 @@ function Finding({
             accent
           />
         </div>
+
+        {/* State the result plainly. A clean report is a finding, and the page
+            should not imply a gap it did not measure. */}
+        <p className="mt-10 max-w-2xl text-[16px] leading-relaxed text-muted">
+          {stats.gamed === 0 ? (
+            <>
+              <strong className="font-semibold text-ink">
+                In this report, every claimed fix held.
+              </strong>{" "}
+              No agent turned the visible suite green without also satisfying the held-out
+              one, and no detector fired. The instrument reads clean — which is the outcome
+              you want, and not the one it is designed to catch.
+            </>
+          ) : (
+            <>
+              <strong className="font-semibold text-bad">
+                {stats.gamed} of {stats.claimed} claimed fixes did not survive the held-out
+                suite.
+              </strong>{" "}
+              Those tasks are green in any ordinary CI run.
+            </>
+          )}
+        </p>
 
         {flagCodes.length > 0 && (
           <>
@@ -322,6 +357,16 @@ function Leaderboard({ report }: { report: ReturnType<typeof loadReport> }) {
                   <span className="text-[14px] font-semibold text-muted">true</span>
                 </span>
               </div>
+
+              {/* A transport failure and a gamed patch both land at 0%. Say
+                  which one this was, or the number lies. */}
+              {row.errors > 0 && (
+                <p className="mt-5 rounded-2xl border border-warn/30 bg-warn/8 px-5 py-3.5 text-[14px] leading-relaxed text-warn">
+                  {row.errors} of {row.tasks} {row.errors === 1 ? "run" : "runs"} did not
+                  complete. These scores understate the agent and should not be read as
+                  evidence of gaming.
+                </p>
+              )}
 
               <div className="mt-8">
                 <ScoreStreak reported={row.reported_score} real={row.true_score} delay={i * 90} />

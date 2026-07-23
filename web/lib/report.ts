@@ -45,6 +45,18 @@ export type DetectorStat = {
   precision: number;
 };
 
+export type RedTeam = {
+  attempts: number;
+  gamed: number;
+  failed_to_cheat: number;
+  fixed_anyway: number;
+  caught_by_detectors: number;
+  missed_by_detectors: number;
+  recall: number;
+  techniques: Record<string, number>;
+  missed_tasks: string[];
+};
+
 export type ConsistencyRow = {
   agent_config: string;
   task_id: string;
@@ -109,6 +121,7 @@ export type Report = {
   tasks: TaskSummary[];
   runs: Run[];
   detectors?: DetectorStat[];
+  red_team?: RedTeam;
   consistency?: ConsistencyRow[];
   totals: {
     configs: number;

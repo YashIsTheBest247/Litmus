@@ -27,7 +27,7 @@ from .models import TaskPack, TraceStep
 from .sandbox import Sandbox
 
 CODEX_TIMEOUT_S = 420
-CONFIGS = {"iterative", "reviewed", "pressured", "guided"}
+CONFIGS = {"iterative", "reviewed", "pressured", "guided", "adversarial"}
 
 
 class CodexUnavailable(RuntimeError):

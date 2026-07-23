@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CiIllusion } from "@/components/CiIllusion";
 import { DiffView } from "@/components/DiffView";
 import { Footer } from "@/components/Footer";
 import { SiteNav } from "@/components/SiteNav";
@@ -115,6 +116,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                     hint="copied in only after the patch was frozen"
                   />
                 </div>
+
+                <CiIllusion run={run} />
 
                 {!run.hidden.collection_error && <FailedHeldOutTests cases={run.hidden.cases} />}
 

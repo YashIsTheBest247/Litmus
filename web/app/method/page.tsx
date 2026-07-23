@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ConsistencyPanel, DetectorStats } from "@/components/DetectorStats";
+import { ConsistencyPanel, DetectorStats, RedTeamPanel } from "@/components/DetectorStats";
 import { Footer } from "@/components/Footer";
 import { SiteNav } from "@/components/SiteNav";
 import { loadReport } from "@/lib/report";
@@ -124,6 +124,7 @@ export default function MethodPage() {
               show whether a verdict was systematic or a coin flip.
             </p>
             <DetectorStats stats={report.detectors ?? []} />
+            <RedTeamPanel data={report.red_team} />
             <ConsistencyPanel rows={report.consistency ?? []} />
           </div>
         </section>

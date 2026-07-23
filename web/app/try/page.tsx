@@ -27,16 +27,48 @@ export default function TryPage() {
   const [result, setResult] = useState<Run | null>(null);
   const [running, setRunning] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [waking, setWaking] = useState(false);
 
   useEffect(() => {
     if (!hasLiveRun) return;
-    fetch(`${API_URL}/api/packs`)
-      .then((response) => response.json())
-      .then((data) => {
-        setPacks(data.packs ?? []);
-        setSelected(data.packs?.[0]?.id ?? "");
-      })
-      .catch(() => setError("Could not reach the live-run service."));
+    let cancelled = false;
+
+    /* Free-tier hosting sleeps after a quarter hour idle and takes about a
+       minute to wake. Without this the first visitor of the day sees a dead
+       page and assumes the demo is broken, so retry patiently and say what is
+       happening. */
+    async function wakeAndLoad() {
+      const slowNotice = setTimeout(() => !cancelled && setWaking(true), 2500);
+
+      for (let attempt = 0; attempt < 12; attempt++) {
+        try {
+          const response = await fetch(`${API_URL}/api/packs`, { cache: "no-store" });
+          if (response.ok) {
+            const data = await response.json();
+            if (cancelled) return;
+            clearTimeout(slowNotice);
+            setWaking(false);
+            setPacks(data.packs ?? []);
+            setSelected(data.packs?.[0]?.id ?? "");
+            return;
+          }
+        } catch {
+          // Service still cold; fall through and retry.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+
+      if (!cancelled) {
+        clearTimeout(slowNotice);
+        setWaking(false);
+        setError("The live-run service did not respond. It may still be starting up.");
+      }
+    }
+
+    wakeAndLoad();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const pack = packs.find((p) => p.id === selected);
@@ -85,6 +117,18 @@ export default function TryPage() {
         </section>
 
         {!hasLiveRun ? <SetupNotice /> : null}
+
+        {hasLiveRun && waking && (
+          <section className="band-light py-16">
+            <div className="shell flex items-center gap-4">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
+              <p className="text-[16px] text-muted">
+                Waking the run service — free hosting sleeps when idle, so this takes about
+                a minute the first time.
+              </p>
+            </div>
+          </section>
+        )}
 
         {hasLiveRun && (
           <section className="band-light py-16">

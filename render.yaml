@@ -1,0 +1,23 @@
+# Live-run service. Render builds the Docker image from the repository root so
+# the harness and the packs are both available inside it.
+#
+# The free plan sleeps after ~15 minutes idle and takes roughly a minute to
+# wake. The Try page handles that explicitly rather than looking broken.
+services:
+  - type: web
+    name: litmus-service
+    runtime: docker
+    dockerfilePath: ./service/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: LITMUS_PACKS
+        value: /app/packs
+      # Set to the deployed site origin once Vercel has assigned one.
+      - key: LITMUS_ALLOWED_ORIGINS
+        sync: false
+      # Deliberately absent: LITMUS_ALLOW_CUSTOM_PATCH. Turning it on lets the
+      # public submit arbitrary code for execution.

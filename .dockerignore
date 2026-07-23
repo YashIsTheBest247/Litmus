@@ -1,0 +1,21 @@
+# Keep the service image small, and keep secrets out of it entirely.
+.env
+.env.local
+*.env
+
+.git/
+.venv/
+venv/
+
+web/
+node_modules/
+.next/
+
+runs/
+harness/**/*.egg-info/
+**/__pycache__/
+**/.pytest_cache/
+*.pyc
+
+.github/
+*.md

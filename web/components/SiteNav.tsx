@@ -11,6 +11,7 @@ const LINKS: { href: string; label: string; hash?: string }[] = [
   { href: "/#finding", label: "The finding", hash: "finding" },
   { href: "/#leaderboard", label: "Leaderboard", hash: "leaderboard" },
   { href: "/#tasks", label: "Tasks", hash: "tasks" },
+  { href: "/try", label: "Run it" },
   { href: "/method", label: "How it works" },
 ];
 

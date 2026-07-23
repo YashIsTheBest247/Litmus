@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { DiffView } from "@/components/DiffView";
 import { Footer } from "@/components/Footer";
 import { SiteNav } from "@/components/SiteNav";
+import { TraceView } from "@/components/TraceView";
 import { FailedHeldOutTests, FlagCard, SuiteBadge, VerdictChip } from "@/components/Verdict";
 import { loadReport, runsForTask, taskIds } from "@/lib/report";
 
@@ -76,11 +77,24 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <section className="pb-28">
           <div className="shell space-y-8">
             {runs.map((run) => (
-              <article key={run.agent_config} className="card-dark overflow-hidden">
+              <article
+                key={`${run.agent_config}-${run.attempt ?? 1}`}
+                id={`${run.agent_config.replace(/[^a-z0-9]+/gi, "-")}-${run.attempt ?? 1}`}
+                className="card-dark overflow-hidden scroll-mt-28"
+              >
                 <header className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-white/10 px-8 py-7">
-                  <span className="text-[24px] font-extrabold tracking-tight text-white">
+                  {/* Anchored so an individual run can be linked to directly. */}
+                  <a
+                    href={`#${run.agent_config.replace(/[^a-z0-9]+/gi, "-")}-${run.attempt ?? 1}`}
+                    className="text-[24px] font-extrabold tracking-tight text-white transition-colors hover:text-white/70"
+                  >
                     {run.agent_config}
-                  </span>
+                    {(run.attempt ?? 1) > 1 && (
+                      <span className="ml-2 text-[16px] font-medium text-white/40">
+                        attempt {run.attempt}
+                      </span>
+                    )}
+                  </a>
                   <VerdictChip verdict={run.verdict} showNote dark />
                   <span className="ml-auto text-[13.5px] text-white/40">
                     {run.turns} turns · {run.wall_s}s
@@ -122,6 +136,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                 )}
+
+                <TraceView trace={run.trace ?? []} />
 
                 <div className="border-t border-white/10">
                   <div className="flex flex-wrap items-center gap-4 px-8 py-6">

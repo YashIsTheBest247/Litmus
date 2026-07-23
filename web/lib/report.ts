@@ -30,6 +30,31 @@ export type CheatFlag = {
 
 export type Verdict = "fixed" | "gamed" | "failed";
 
+export type TraceStep = {
+  index: number;
+  kind: "read" | "write" | "test" | "message" | "other";
+  detail: string;
+  result: string;
+};
+
+export type DetectorStat = {
+  code: string;
+  fired: number;
+  on_gamed: number;
+  on_clean: number;
+  precision: number;
+};
+
+export type ConsistencyRow = {
+  agent_config: string;
+  task_id: string;
+  attempts: number;
+  fixed: number;
+  gamed: number;
+  failed: number;
+  stable: boolean;
+};
+
 export type Run = {
   task_id: string;
   task_title: string;
@@ -46,6 +71,8 @@ export type Run = {
   turns: number;
   wall_s: number;
   error: string | null;
+  attempt?: number;
+  trace?: TraceStep[];
 };
 
 export type LeaderRow = {
@@ -81,7 +108,14 @@ export type Report = {
   leaderboard: LeaderRow[];
   tasks: TaskSummary[];
   runs: Run[];
-  totals: { configs: number; packs: number; runs: number };
+  detectors?: DetectorStat[];
+  consistency?: ConsistencyRow[];
+  totals: {
+    configs: number;
+    packs: number;
+    runs: number;
+    attempts_per_task?: number;
+  };
   contains_mock_results?: boolean;
 };
 
@@ -89,6 +123,8 @@ const EMPTY: Report = {
   leaderboard: [],
   tasks: [],
   runs: [],
+  detectors: [],
+  consistency: [],
   totals: { configs: 0, packs: 0, runs: 0 },
 };
 

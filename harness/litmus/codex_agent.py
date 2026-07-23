@@ -23,7 +23,7 @@ import time
 from pathlib import Path
 
 from .agents import NEUTRAL_PROMPT, PROMPTS, REVIEW_PROMPT, AgentOutcome, _current_patch
-from .models import TaskPack
+from .models import TaskPack, TraceStep
 from .sandbox import Sandbox
 
 CODEX_TIMEOUT_S = 420
@@ -46,6 +46,57 @@ def codex_command() -> list[str]:
         if shim.exists():
             return [str(shim)]
     return [found]
+
+
+def _parse_trace(jsonl: str, start_index: int = 0) -> list[TraceStep]:
+    """Turn the Codex event stream into ordered trace steps.
+
+    Each `item.completed` carries the action the agent just finished. The shape
+    varies by item type, so this reads defensively and falls back to the type
+    name rather than dropping the step.
+    """
+    steps: list[TraceStep] = []
+    for line in jsonl.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") != "item.completed":
+            continue
+
+        item = event.get("item") or {}
+        item_type = str(item.get("type") or item.get("item_type") or "item")
+
+        detail = ""
+        kind = "other"
+        if "command" in item:
+            command = str(item.get("command") or "")
+            detail = command[:160]
+            kind = "test" if "pytest" in command else "read"
+        elif "patch" in item_type or "file_change" in item_type:
+            kind = "write"
+            changes = item.get("changes") or item.get("files") or []
+            names = [str(c.get("path", c)) if isinstance(c, dict) else str(c) for c in changes]
+            detail = ", ".join(names)[:160] or "applied a patch"
+        elif "message" in item_type or "text" in item:
+            kind = "message"
+            detail = str(item.get("text") or "").strip().splitlines()[:1]
+            detail = (detail[0] if detail else "")[:160]
+        else:
+            detail = item_type
+
+        steps.append(
+            TraceStep(
+                index=start_index + len(steps) + 1,
+                kind=kind,
+                detail=detail or item_type,
+                result=str(item.get("status") or ""),
+            )
+        )
+    return steps
 
 
 def _count_turns(jsonl: str) -> int:
@@ -122,14 +173,22 @@ class CodexCliAgent:
         except CodexUnavailable as exc:
             return AgentOutcome(turns=0, error=str(exc))
 
-        turns, error = self._exec(base, sandbox, self._brief(sandbox, pack))
+        trace: list[TraceStep] = []
+        turns, error, steps = self._exec(base, sandbox, self._brief(sandbox, pack), trace)
+        trace.extend(steps)
 
         if self.config == "reviewed" and error is None:
             patch = _current_patch(sandbox) or "(no changes)"
-            extra, error = self._exec(base, sandbox, REVIEW_PROMPT.format(patch=patch))
+            trace.append(
+                TraceStep(index=len(trace) + 1, kind="message", detail="self-review turn")
+            )
+            extra, error, more = self._exec(
+                base, sandbox, REVIEW_PROMPT.format(patch=patch), trace
+            )
+            trace.extend(more)
             turns += extra
 
-        return AgentOutcome(turns=turns, error=error)
+        return AgentOutcome(turns=turns, error=error, trace=trace)
 
     def _brief(self, sandbox: Sandbox, pack: TaskPack) -> str:
         listing = "\n".join(f"- {f}" for f in sandbox.list_files())
@@ -141,7 +200,9 @@ class CodexCliAgent:
             f"check your work, then stop."
         )
 
-    def _exec(self, base: list[str], sandbox: Sandbox, prompt: str) -> tuple[int, str | None]:
+    def _exec(
+        self, base: list[str], sandbox: Sandbox, prompt: str, so_far: list[TraceStep]
+    ) -> tuple[int, str | None, list[TraceStep]]:
         # Every option goes before the positional, and the prompt is fed over
         # stdin as "-". Passing a multi-line prompt as argv made clap stop
         # parsing the flags that follow it.
@@ -173,15 +234,18 @@ class CodexCliAgent:
                 errors="replace",
             )
         except subprocess.TimeoutExpired:
-            return 0, f"codex exec timed out after {self.timeout_s}s"
+            return 0, f"codex exec timed out after {self.timeout_s}s", []
         except OSError as exc:
-            return 0, f"could not launch codex: {exc}"
+            return 0, f"could not launch codex: {exc}", []
 
-        turns = _count_turns(proc.stdout or "")
+        stdout = proc.stdout or ""
+        turns = _count_turns(stdout)
+        steps = _parse_trace(stdout, start_index=len(so_far))
+
         if proc.returncode != 0:
-            tail = ((proc.stderr or "") + (proc.stdout or "")).strip()[-400:]
-            return turns, f"codex exec exited {proc.returncode}: {tail}"
-        return turns, None
+            tail = ((proc.stderr or "") + stdout).strip()[-400:]
+            return turns, f"codex exec exited {proc.returncode}: {tail}", steps
+        return turns, None, steps
 
 
 def preflight() -> tuple[bool, str]:

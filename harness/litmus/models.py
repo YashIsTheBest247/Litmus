@@ -144,9 +144,49 @@ class CheatFlag:
         }
 
 
+def _suite_from_dict(data: dict[str, Any]) -> "SuiteResult":
+    suite = SuiteResult(
+        suite=data.get("suite", ""),
+        total=data.get("total", 0),
+        passed=data.get("passed", 0),
+        failed=data.get("failed", 0),
+        errored=data.get("errored", 0),
+        skipped=data.get("skipped", 0),
+        duration_s=data.get("duration_s", 0.0),
+        timed_out=data.get("timed_out", False),
+        collection_error=data.get("collection_error", False),
+        output_tail=data.get("output_tail", ""),
+    )
+    suite.cases = [
+        TestCaseResult(
+            name=c.get("name", ""), status=c.get("status", ""), message=c.get("message", "")
+        )
+        for c in data.get("cases", [])
+    ]
+    return suite
+
+
+@dataclass
+class TraceStep:
+    """One observable action the agent took, in order."""
+
+    index: int
+    kind: str  # read | write | test | message | other
+    detail: str
+    result: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "index": self.index,
+            "kind": self.kind,
+            "detail": self.detail,
+            "result": self.result,
+        }
+
+
 @dataclass
 class TaskRun:
-    """One agent config attempting one task."""
+    """One agent config attempting one task, once."""
 
     task_id: str
     task_title: str
@@ -162,6 +202,50 @@ class TaskRun:
     turns: int = 0
     wall_s: float = 0.0
     error: str | None = None
+    # Which repetition this was. Agents are stochastic, so a single run is weak
+    # evidence; attempts let the report show consistency rather than a coin flip.
+    attempt: int = 1
+    trace: list[TraceStep] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TaskRun":
+        """Rebuild a run from a saved artifact, so reports can be merged."""
+        return cls(
+            task_id=data["task_id"],
+            task_title=data.get("task_title", ""),
+            category=data.get("category", ""),
+            agent_config=data.get("agent_config", ""),
+            model=data.get("model", ""),
+            public=_suite_from_dict(data.get("public", {})),
+            hidden=_suite_from_dict(data.get("hidden", {})),
+            bug_report=data.get("bug_report", ""),
+            flags=[
+                CheatFlag(
+                    code=f.get("code", ""),
+                    severity=f.get("severity", "low"),
+                    file=f.get("file", ""),
+                    line=f.get("line", 0),
+                    evidence=f.get("evidence", ""),
+                    explanation=f.get("explanation", ""),
+                )
+                for f in data.get("flags", [])
+            ],
+            patch=data.get("patch", ""),
+            files_changed=data.get("files_changed", []),
+            turns=data.get("turns", 0),
+            wall_s=data.get("wall_s", 0.0),
+            error=data.get("error"),
+            attempt=data.get("attempt", 1),
+            trace=[
+                TraceStep(
+                    index=s.get("index", i + 1),
+                    kind=s.get("kind", "other"),
+                    detail=s.get("detail", ""),
+                    result=s.get("result", ""),
+                )
+                for i, s in enumerate(data.get("trace", []))
+            ],
+        )
 
     @property
     def verdict(self) -> str:
@@ -196,4 +280,6 @@ class TaskRun:
             "turns": self.turns,
             "wall_s": round(self.wall_s, 2),
             "error": self.error,
+            "attempt": self.attempt,
+            "trace": [step.to_dict() for step in self.trace],
         }

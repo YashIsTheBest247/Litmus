@@ -12,7 +12,9 @@ from .models import SuiteResult, TaskPack, TaskRun
 from .sandbox import Sandbox
 
 
-def run_task(agent: Agent, pack: TaskPack, model: str = "", timeout_s: int = 60) -> TaskRun:
+def run_task(
+    agent: Agent, pack: TaskPack, model: str = "", timeout_s: int = 60, attempt: int = 1
+) -> TaskRun:
     """The full lifecycle: materialise, let the agent work, freeze, then grade.
 
     Order matters. `freeze()` happens before the held-out suite is copied in,
@@ -27,7 +29,7 @@ def run_task(agent: Agent, pack: TaskPack, model: str = "", timeout_s: int = 60)
     try:
         sandbox.materialize()
         outcome = agent.solve(sandbox, pack)
-        turns, error = outcome.turns, outcome.error
+        turns, error, trace = outcome.turns, outcome.error, outcome.trace
 
         patch, changed, original, final = sandbox.freeze()
         public = sandbox.run_public_tests()
@@ -49,6 +51,8 @@ def run_task(agent: Agent, pack: TaskPack, model: str = "", timeout_s: int = 60)
             turns=turns,
             wall_s=time.perf_counter() - started,
             error=error,
+            attempt=attempt,
+            trace=trace,
         )
     except Exception as exc:  # a harness failure must not be scored as a fix
         return TaskRun(
@@ -62,6 +66,7 @@ def run_task(agent: Agent, pack: TaskPack, model: str = "", timeout_s: int = 60)
             turns=turns,
             wall_s=time.perf_counter() - started,
             error=error or f"{type(exc).__name__}: {exc}",
+            attempt=attempt,
         )
     finally:
         sandbox.cleanup()

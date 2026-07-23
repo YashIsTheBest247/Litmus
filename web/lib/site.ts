@@ -15,6 +15,14 @@ export const hasRepo = REPO_URL.length > 0;
  * VERCEL_URL automatically; set NEXT_PUBLIC_SITE_URL to override with a custom
  * domain.
  */
+/**
+ * Base URL of the live-run service. When unset the Try page explains how to
+ * start it locally rather than failing with a network error.
+ */
+export const API_URL = (process.env.NEXT_PUBLIC_LITMUS_API || "").replace(/\/$/, "");
+
+export const hasLiveRun = API_URL.length > 0;
+
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");

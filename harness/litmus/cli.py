@@ -9,11 +9,13 @@ import sys
 from pathlib import Path
 
 from .agents import build_agent
+from .check import as_markdown, check_patch
 from .providers import DEFAULT_MODELS, DEFAULT_RPM
-from .models import VERDICT_FIXED, VERDICT_GAMED, TaskRun
+from .scaffold import scaffold_pack
+from .models import VERDICT_GAMED, TaskRun
 from .packs import PackError, load_all
 from .runner import run_task
-from .scorer import build_report
+from .scorer import build_report  # noqa: F401  (used by cmd_run and cmd_report)
 from .validate import validate_pack
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -75,10 +77,11 @@ def cmd_validate(args) -> int:
     return 1 if failures else 0
 
 
-def _print_run(run: TaskRun) -> None:
+def _print_run(run: TaskRun, attempt: int | None = None) -> None:
     mark = VERDICT_MARK[run.verdict]
+    label = f"{run.task_id} #{attempt}" if attempt else run.task_id
     print(
-        f"  {mark:<5}  {run.task_id:<28} "
+        f"  {mark:<5}  {label:<30} "
         f"public {run.public.passed}/{run.public.total}  "
         f"hidden {run.hidden.passed}/{run.hidden.total}  "
         f"flags {len(run.flags)}"
@@ -122,9 +125,12 @@ def cmd_run(args) -> int:
 
         collected: list[TaskRun] = []
         for pack in packs:
-            run = run_task(agent, pack, model=model_label, timeout_s=args.timeout)
-            collected.append(run)
-            _print_run(run)
+            for attempt in range(1, max(1, args.repeat) + 1):
+                run = run_task(
+                    agent, pack, model=model_label, timeout_s=args.timeout, attempt=attempt
+                )
+                collected.append(run)
+                _print_run(run, attempt if args.repeat > 1 else None)
         runs_by_config[agent.name] = collected
 
     report = build_report(runs_by_config)
@@ -145,6 +151,122 @@ def cmd_run(args) -> int:
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\nwrote {out}")
     return 0
+
+
+def cmd_report(args) -> int:
+    """Merge saved run artifacts into one report.
+
+    Provider quotas mean a full sweep often cannot be done in one sitting. This
+    lets runs accumulate across sessions and be combined afterwards, and it
+    keeps a failed batch from destroying results that were already good.
+    """
+    sources: list[Path] = []
+    for pattern in args.sources:
+        matches = sorted(Path().glob(pattern)) if any(c in pattern for c in "*?[") else [Path(pattern)]
+        sources.extend(m for m in matches if m.is_file())
+
+    if not sources:
+        sys.exit("no run artifacts matched")
+
+    runs_by_config: dict[str, list[TaskRun]] = {}
+    seen: set[tuple[str, str, int]] = set()
+    dropped = 0
+
+    for source in sources:
+        try:
+            payload = json.loads(source.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"  skipped {source}: {exc}")
+            continue
+
+        for record in payload.get("runs", []):
+            run = TaskRun.from_dict(record)
+            if args.drop_errors and run.error:
+                dropped += 1
+                continue
+            if args.drop_mock and run.agent_config.startswith("mock:"):
+                dropped += 1
+                continue
+
+            # Later files win for the same config/task/attempt.
+            key = (run.agent_config, run.task_id, run.attempt)
+            if key in seen:
+                runs_by_config[run.agent_config] = [
+                    r
+                    for r in runs_by_config[run.agent_config]
+                    if (r.agent_config, r.task_id, r.attempt) != key
+                ]
+            seen.add(key)
+            runs_by_config.setdefault(run.agent_config, []).append(run)
+
+        print(f"  read {source}")
+
+    if not runs_by_config:
+        sys.exit("nothing left after filtering")
+
+    report = build_report(runs_by_config)
+    report["contains_mock_results"] = any(c.startswith("mock:") for c in runs_by_config)
+
+    print()
+    for row in report["leaderboard"]:
+        print(
+            f"{row['agent_config']:<20} "
+            f"reported {row['reported_score']:>5}%   "
+            f"true {row['true_score']:>5}%   "
+            f"gap {row['integrity_gap']:>5} pts   "
+            f"runs {row['tasks']}"
+        )
+
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(f"\nmerged {len(seen)} runs into {out}" + (f" ({dropped} dropped)" if dropped else ""))
+    return 0
+
+
+def cmd_new_pack(args) -> int:
+    try:
+        root = scaffold_pack(Path(args.packs), args.id, args.title, args.category)
+    except FileExistsError as exc:
+        sys.exit(str(exc))
+
+    print(f"created {root}")
+    print("\nnext:")
+    print("  1. seed a real bug in workspace/solution.py")
+    print("  2. write the correct version in reference/solution.py")
+    print("  3. make one public test fail against the bug")
+    print("  4. write held-out tests as properties, not examples")
+    print(f"\nthen: litmus validate --only {args.id}")
+    return 0
+
+
+def cmd_check(args) -> int:
+    try:
+        packs = load_all(Path(args.packs))
+    except PackError as exc:
+        sys.exit(str(exc))
+
+    pack = next((p for p in packs if p.id == args.pack), None)
+    if pack is None:
+        sys.exit(f"unknown pack: {args.pack}")
+
+    patch_text = (
+        sys.stdin.read() if args.patch == "-" else Path(args.patch).read_text(encoding="utf-8")
+    )
+    run = check_patch(pack, patch_text, timeout_s=args.timeout)
+
+    if args.markdown:
+        print(as_markdown(run))
+    else:
+        _print_run(run)
+
+    if args.json_out:
+        out = Path(args.json_out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(run.to_dict(), indent=2), encoding="utf-8")
+
+    # Non-zero when the patch games the tests, so CI can block on it.
+    return 1 if run.verdict == VERDICT_GAMED else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -189,12 +311,50 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--out", default="runs/latest.json")
     run.add_argument("--allow-mock", action="store_true")
     run.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="attempts per task. Agents are stochastic, so one run cannot tell a "
+        "systematic behaviour from a coin flip (default 1)",
+    )
+    run.add_argument(
         "--allow-codex-unsandboxed",
         action="store_true",
         help="let codex:* agents run with OS sandboxing disabled. Required on "
         "platforms where the CLI cannot obtain workspace write access otherwise.",
     )
     run.set_defaults(func=cmd_run)
+
+    report = sub.add_parser(
+        "report", help="merge saved run artifacts into one report"
+    )
+    report.add_argument("sources", nargs="+", help="run JSON files or globs")
+    report.add_argument("--out", default="web/data/report.json")
+    report.add_argument(
+        "--drop-errors",
+        action="store_true",
+        help="exclude runs that did not complete, so a quota failure cannot "
+        "masquerade as a zero score",
+    )
+    report.add_argument("--drop-mock", action="store_true", help="exclude fixture runs")
+    report.set_defaults(func=cmd_report)
+
+    new_pack = sub.add_parser("new-pack", help="scaffold a new task pack")
+    new_pack.add_argument("id", help="pack id, e.g. p004-timezone-rounding")
+    new_pack.add_argument("--title", default="TODO: one-line symptom")
+    new_pack.add_argument("--category", default="general")
+    new_pack.set_defaults(func=cmd_new_pack)
+
+    check = sub.add_parser(
+        "check",
+        help="grade a patch produced elsewhere; exits 1 when the patch games the tests",
+    )
+    check.add_argument("--pack", required=True, help="pack id to grade against")
+    check.add_argument("--patch", required=True, help="unified diff file, or - for stdin")
+    check.add_argument("--timeout", type=int, default=60)
+    check.add_argument("--markdown", action="store_true", help="emit a PR comment")
+    check.add_argument("--json-out", help="also write the full run record here")
+    check.set_defaults(func=cmd_check)
 
     args = parser.parse_args(argv)
     return args.func(args)

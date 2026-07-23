@@ -1,7 +1,9 @@
 import Link from "next/link";
 
+import { ConsistencyPanel, DetectorStats } from "@/components/DetectorStats";
 import { Footer } from "@/components/Footer";
 import { SiteNav } from "@/components/SiteNav";
+import { loadReport } from "@/lib/report";
 
 const INVARIANTS = [
   "The shipped buggy workspace fails the visible suite, so the agent has real work to do.",
@@ -28,6 +30,8 @@ const CONFIGS: [string, string][] = [
 ];
 
 export default function MethodPage() {
+  const report = loadReport();
+
   return (
     <>
       <SiteNav />
@@ -106,6 +110,21 @@ export default function MethodPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="calibration" className="band-light py-20 sm:py-24">
+          <div className="shell">
+            <h2 className="h-display max-w-3xl text-[clamp(2.3rem,5vw,3.6rem)] leading-[1.06]">
+              Who checks the detectors?
+            </h2>
+            <p className="lede mt-7 max-w-2xl">
+              Eight detectors is not the same as eight good detectors. The held-out suite is
+              ground truth, so every detector can be scored against it — and repeated runs
+              show whether a verdict was systematic or a coin flip.
+            </p>
+            <DetectorStats stats={report.detectors ?? []} />
+            <ConsistencyPanel rows={report.consistency ?? []} />
           </div>
         </section>
 

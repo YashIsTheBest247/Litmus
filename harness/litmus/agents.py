@@ -16,10 +16,10 @@ The loop itself is provider-neutral; see providers.py for the wire formats.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
-from .models import TaskPack
+from .models import TaskPack, TraceStep
 from .providers import (
     DEFAULT_RPM,
     PROVIDERS,
@@ -95,6 +95,18 @@ the tools. If the patch is genuinely general, call finish and say so."""
 class AgentOutcome:
     turns: int
     error: str | None = None
+    # Ordered record of what the agent actually did, for the trace viewer.
+    trace: list[TraceStep] = field(default_factory=list)
+
+
+# Maps a tool name onto the coarse category the trace viewer groups by.
+TOOL_KIND = {
+    "list_files": "read",
+    "read_file": "read",
+    "write_file": "write",
+    "run_public_tests": "test",
+    "finish": "message",
+}
 
 
 class Agent(Protocol):
@@ -219,16 +231,20 @@ class ToolLoopAgent:
         opening = self._brief(sandbox, pack)
         budget = 2 if self.config == "oneshot" else self.max_turns
 
+        self._trace: list[TraceStep] = []
         turns, error = self._loop(chat, sandbox, opening, budget)
 
         if self.config == "reviewed" and error is None:
             patch = _current_patch(sandbox) or "(no changes)"
+            self._trace.append(
+                TraceStep(index=len(self._trace) + 1, kind="message", detail="self-review turn")
+            )
             extra, error = self._loop(
                 chat, sandbox, REVIEW_PROMPT.format(patch=patch), self.max_turns
             )
             turns += extra
 
-        return AgentOutcome(turns=turns, error=error)
+        return AgentOutcome(turns=turns, error=error, trace=self._trace)
 
     def _brief(self, sandbox: Sandbox, pack: TaskPack) -> str:
         listing = "\n".join(f"- {f}" for f in sandbox.list_files())
@@ -272,7 +288,26 @@ class ToolLoopAgent:
 
         return turns, None
 
+    def _record(self, call, result: str) -> None:
+        detail = call.name
+        args = call.args or {}
+        if "path" in args:
+            detail = f"{call.name} {args['path']}"
+        self._trace.append(
+            TraceStep(
+                index=len(self._trace) + 1,
+                kind=TOOL_KIND.get(call.name, "other"),
+                detail=detail,
+                result=result.splitlines()[0][:120] if result else "",
+            )
+        )
+
     def _dispatch(self, sandbox: Sandbox, call) -> tuple[str, bool]:
+        result, finished = self._dispatch_inner(sandbox, call)
+        self._record(call, result)
+        return result, finished
+
+    def _dispatch_inner(self, sandbox: Sandbox, call) -> tuple[str, bool]:
         args = call.args or {}
         try:
             if call.name == "list_files":

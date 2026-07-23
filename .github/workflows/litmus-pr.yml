@@ -1,0 +1,80 @@
+name: Litmus integrity check
+
+# Grades the patch in a pull request against a held-out test suite the author
+# never saw, and blocks the merge if the visible tests only pass because the
+# patch recognised them.
+on:
+  pull_request:
+    paths:
+      - "packs/**/workspace/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the base commit as well so we can diff against it.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Litmus
+        run: pip install -e ./harness
+
+      - name: Work out which pack this PR touches
+        id: pack
+        run: |
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'packs/*/workspace/*')
+          pack=$(echo "$changed" | head -1 | cut -d/ -f2)
+          if [ -z "$pack" ]; then
+            echo "no pack workspace touched; nothing to grade"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "pack=$pack" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract the patch
+        if: steps.pack.outputs.skip != 'true'
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD \
+            -- "packs/${{ steps.pack.outputs.pack }}/workspace" \
+            | sed "s|packs/${{ steps.pack.outputs.pack }}/workspace/||g" > pr.patch
+          cat pr.patch
+
+      - name: Grade it against the held-out suite
+        if: steps.pack.outputs.skip != 'true'
+        id: grade
+        continue-on-error: true
+        run: |
+          python -m litmus.cli --packs packs check \
+            --pack "${{ steps.pack.outputs.pack }}" \
+            --patch pr.patch \
+            --markdown > comment.md
+          echo "verdict_exit=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on the pull request
+        if: steps.pack.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('comment.md', 'utf8');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+      - name: Fail the check when the patch games the tests
+        if: steps.pack.outputs.skip != 'true' && steps.grade.outcome == 'failure'
+        run: |
+          echo "::error::This patch passes the visible tests without passing the held-out suite."
+          exit 1

@@ -85,26 +85,11 @@ export function SiteNav() {
             ))}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {/* Below lg the link row is hidden, so without this the site has
-                no navigation at all on a phone. */}
-            <button
-              type="button"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-              className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors lg:hidden ${
-                onLight
-                  ? "border-ink/12 text-ink hover:border-ink/30"
-                  : "border-white/20 text-white hover:border-white/45"
-              }`}
-            >
-              <MenuIcon open={menuOpen} />
-            </button>
-
+          {/* Desktop-only cluster: Detectors, back-to-top, and the primary CTA. */}
+          <div className="ml-auto hidden items-center gap-2 lg:flex">
             <Link
               href="/method#detectors"
-              className={`hidden items-center gap-2 rounded-full border px-4 py-2.5 text-[14.5px] font-medium transition-colors sm:inline-flex ${
+              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-[14.5px] font-medium transition-colors ${
                 onLight
                   ? "border-ink/12 text-ink hover:border-ink/30"
                   : "border-white/20 text-white hover:border-white/45"
@@ -118,7 +103,7 @@ export function SiteNav() {
               type="button"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
               aria-label="Back to top"
-              className={`hidden h-11 w-11 items-center justify-center rounded-full border transition-colors sm:inline-flex ${
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
                 onLight
                   ? "border-ink/12 text-ink hover:border-ink/30"
                   : "border-white/20 text-white hover:border-white/45"
@@ -127,33 +112,28 @@ export function SiteNav() {
               <ArrowUpIcon />
             </button>
 
-            {hasRepo ? (
-              <a
-                href={REPO_URL}
-                target="_blank"
-                rel="noreferrer"
-                className={`inline-flex items-center gap-1.5 rounded-full px-5 py-3 text-[15px] font-semibold transition-transform hover:-translate-y-0.5 ${
-                  onLight ? "bg-ink text-white" : "bg-white text-ink"
-                }`}
-              >
-                Repository <span className="text-[13px]">↗</span>
-              </a>
-            ) : (
-              <Link
-                href="/#tasks"
-                className={`inline-flex items-center gap-1.5 rounded-full px-5 py-3 text-[15px] font-semibold transition-transform hover:-translate-y-0.5 ${
-                  onLight ? "bg-ink text-white" : "bg-white text-ink"
-                }`}
-              >
-                Inspect a patch
-              </Link>
-            )}
+            {primaryCta("inline-flex items-center gap-1.5 rounded-full px-5 py-3 text-[15px] font-semibold transition-transform hover:-translate-y-0.5")}
           </div>
+
+          {/* Mobile: only a hamburger. Everything lives in the dropdown. */}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            className={`ml-auto inline-flex h-11 w-11 items-center justify-center rounded-full border transition-colors lg:hidden ${
+              onLight
+                ? "border-ink/12 text-ink hover:border-ink/30"
+                : "border-white/20 text-white hover:border-white/45"
+            }`}
+          >
+            <MenuIcon open={menuOpen} />
+          </button>
         </nav>
 
         {menuOpen && (
           <div
-            className={`mt-2 overflow-hidden rounded-4xl border p-2 backdrop-blur-2xl lg:hidden ${
+            className={`mt-2 rounded-4xl border p-3 backdrop-blur-2xl lg:hidden ${
               onLight ? "border-ink/10 bg-white/95 shadow-pill" : "border-white/12 bg-ink/90"
             }`}
           >
@@ -171,28 +151,57 @@ export function SiteNav() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              href="/method#detectors"
+              onClick={() => setMenuOpen(false)}
+              className={`block rounded-3xl px-5 py-3.5 text-[16px] font-medium transition-colors ${
+                onLight
+                  ? "text-ink/80 hover:bg-ink/5 hover:text-ink"
+                  : "text-white/80 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              Detectors
+            </Link>
+
+            {/* The primary action, highlighted and full-width. */}
+            {primaryCta(
+              "mt-2 flex items-center justify-center gap-1.5 rounded-3xl px-5 py-4 text-[16px] font-semibold " +
+                (onLight ? "bg-ink text-white" : "bg-white text-ink"),
+            )}
           </div>
         )}
       </div>
     </div>
   );
+
+  function primaryCta(className: string) {
+    return hasRepo ? (
+      <a href={REPO_URL} target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)} className={className}>
+        Repository <span className="text-[13px]">↗</span>
+      </a>
+    ) : (
+      <Link href="/#tasks" onClick={() => setMenuOpen(false)} className={className}>
+        Inspect a patch
+      </Link>
+    );
+  }
 }
 
 function MenuIcon({ open }: { open: boolean }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
       {open ? (
         <path
-          d="M4 4l8 8M12 4l-8 8"
+          d="M4.5 4.5l9 9M13.5 4.5l-9 9"
           stroke="currentColor"
-          strokeWidth="1.6"
+          strokeWidth="1.7"
           strokeLinecap="round"
         />
       ) : (
         <path
-          d="M2.5 5h11M2.5 11h11"
+          d="M2.5 5h13M2.5 9h13M2.5 13h13"
           stroke="currentColor"
-          strokeWidth="1.6"
+          strokeWidth="1.7"
           strokeLinecap="round"
         />
       )}

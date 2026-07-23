@@ -26,7 +26,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     <>
       <SiteNav />
       <main data-band="dark" className="band-dark">
-        <section className="relative overflow-hidden pb-20 pt-40">
+        <section className="relative overflow-hidden pb-16 pt-28">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
@@ -43,14 +43,14 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
               ← All tasks
             </Link>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               <span className="rounded-full border border-white/15 px-4 py-1.5 text-[12.5px] font-semibold uppercase tracking-wider2 text-white/60">
                 {first.category}
               </span>
               <span className="font-mono text-[13px] text-white/35">{first.task_id}</span>
             </div>
 
-            <h1 className="h-display mt-7 max-w-4xl text-[clamp(2.4rem,5.6vw,4.2rem)] leading-[1.05] text-white">
+            <h1 className="h-display mt-5 max-w-4xl text-[clamp(2.2rem,5vw,3.6rem)] leading-[1.05] text-white">
               {first.task_title}
             </h1>
 

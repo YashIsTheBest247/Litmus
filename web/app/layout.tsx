@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
+import { HelpChat } from "@/components/HelpChat";
 import { PageTransition } from "@/components/PageTransition";
 import { SITE_URL } from "@/lib/site";
 
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${sans.variable} ${mono.variable}`}>
         <PageTransition>{children}</PageTransition>
+        <HelpChat />
       </body>
     </html>
   );

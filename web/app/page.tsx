@@ -675,6 +675,10 @@ function ClosingPanel() {
               <Link href="/method" className="pill pill-solid-light">
                 Read the method <span className="text-[13px]">↗</span>
               </Link>
+              <a href="/litmus-report.pdf" download className="pill pill-ghost-dark">
+                <DownloadIcon />
+                Download the report
+              </a>
               <Link href="#tasks" className="pill pill-ghost-dark">
                 Inspect the patches
               </Link>
@@ -702,6 +706,20 @@ function EmptyState() {
         </pre>
       </div>
     </section>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M2.5 13h11"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

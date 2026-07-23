@@ -57,7 +57,11 @@ async def _post(method: str, payload: dict[str, Any]) -> dict[str, Any]:
             return {"ok": False}
 
 
-async def _send(chat_id: int, text: str) -> None:
+# A tappable button that asks the bot for the PDF, handled as a callback below.
+REPORT_BUTTON = {"inline_keyboard": [[{"text": "⬇  Download PDF report", "callback_data": "report"}]]}
+
+
+async def _send(chat_id: int, text: str, buttons: dict[str, Any] | None = None) -> None:
     """Send Markdown, but fall back to plain text if Telegram rejects it.
 
     Detector evidence and task titles carry characters legacy Markdown treats
@@ -65,12 +69,15 @@ async def _send(chat_id: int, text: str) -> None:
     unbalanced one makes Telegram reject the whole message with 400, so a
     verdict would silently never arrive. Plain text always gets through.
     """
-    result = await _post(
-        "sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
-    )
+    payload: dict[str, Any] = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    if buttons:
+        payload["reply_markup"] = buttons
+
+    result = await _post("sendMessage", payload)
     if not result.get("ok"):
-        stripped = text.replace("*", "").replace("`", "")
-        await _post("sendMessage", {"chat_id": chat_id, "text": stripped})
+        payload["text"] = text.replace("*", "").replace("`", "")
+        payload.pop("parse_mode", None)
+        await _post("sendMessage", payload)
 
 
 async def _send_pdf(chat_id: int, data: bytes, filename: str, caption: str) -> None:
@@ -110,8 +117,33 @@ def _format_run(run: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+async def _deliver_pdf(chat_id: int, deps: dict[str, Any]) -> None:
+    """Build the report and send it as a downloadable document."""
+    report = deps["load_report"]()
+    if not report:
+        await _send(chat_id, "No report has been published yet.")
+        return
+    await _send(chat_id, "Building the report…")
+    pdf = deps["build_pdf"](report)
+    await _send_pdf(chat_id, pdf, "litmus-report.pdf", "Litmus integrity report")
+
+
 async def handle_update(update: dict[str, Any], deps: dict[str, Any]) -> None:
     """Process one Telegram update. Never raises into the request handler."""
+    # A tapped inline button arrives as a callback_query, not a message.
+    callback = update.get("callback_query")
+    if callback:
+        chat_id = (((callback.get("message") or {}).get("chat")) or {}).get("id")
+        try:
+            # Stop the button's loading spinner immediately, then send the file.
+            await _post("answerCallbackQuery", {"callback_query_id": callback["id"]})
+            if chat_id and callback.get("data") == "report":
+                await _deliver_pdf(chat_id, deps)
+        except Exception as exc:
+            if chat_id:
+                await _send(chat_id, f"That did not work: `{type(exc).__name__}`"[:200])
+        return
+
     message = update.get("message") or update.get("edited_message") or {}
     chat_id = (message.get("chat") or {}).get("id")
     text = (message.get("text") or "").strip()
@@ -124,7 +156,7 @@ async def handle_update(update: dict[str, Any], deps: dict[str, Any]) -> None:
 
     try:
         if command in ("/start", "/help"):
-            await _send(chat_id, INTRO)
+            await _send(chat_id, INTRO, buttons=REPORT_BUTTON)
 
         elif command == "/packs":
             packs = deps["list_packs"]()
@@ -144,15 +176,7 @@ async def handle_update(update: dict[str, Any], deps: dict[str, Any]) -> None:
             await _send(chat_id, _format_run(run))
 
         elif command == "/report":
-            report = deps["load_report"]()
-            if not report:
-                await _send(chat_id, "No report has been published yet.")
-                return
-            await _send(chat_id, "Building the report…")
-            pdf = deps["build_pdf"](report)
-            await _send_pdf(
-                chat_id, pdf, "litmus-report.pdf", "Litmus integrity report"
-            )
+            await _deliver_pdf(chat_id, deps)
 
         else:
             await _send(chat_id, "Unknown command. Try `/help`.")

@@ -24,9 +24,11 @@ const DETECTORS: [string, string, string][] = [
 ];
 
 const CONFIGS: [string, string][] = [
-  ["oneshot", "Sees the code once and writes a patch without ever running the tests."],
-  ["iterative", "Gets the full tool loop and can rerun the visible suite as often as it likes, which is exactly the pressure that produces gaming."],
-  ["reviewed", "Iterative, plus a forced self-critique turn against its own diff before it is allowed to finish."],
+  ["iterative", "The neutral brief. Full tool loop, reruns the visible suite freely, told nothing about how to pass."],
+  ["reviewed", "Neutral, plus a forced self-critique turn against its own diff before it may finish."],
+  ["pressured", "A build is blocked; make the smallest change you can get away with. Deadline framing."],
+  ["guided", "Explicit instruction not to special-case the tests or edit them."],
+  ["adversarial", "Red team: make the visible suite pass by any means. Manufactures the labelled cheats recall needs."],
 ];
 
 export default function MethodPage() {
@@ -132,15 +134,26 @@ export default function MethodPage() {
         <section id="codex" className="band-light py-20 sm:py-24">
           <div className="shell">
             <h2 className="h-display max-w-3xl text-[clamp(2.3rem,5vw,3.6rem)] leading-[1.06]">
-              The agent under test is also the agent that built this.
+              Built with Codex, and Codex is the standard it holds up.
             </h2>
             <p className="lede mt-7 max-w-2xl">
-              Three configurations are compared, and the comparison is the point. Whether the
-              review turn measurably reduces the integrity gap is an empirical question, and
-              the leaderboard answers it.
+              Litmus was written with OpenAI Codex. Codex is also run through the same packs
+              as every other agent — and across the runs recorded here it is the only one with
+              no integrity gap: it fixed every task, including the one built to offer a
+              shortcut, without a single detector finding. That is the comparison a benchmark
+              exists to make.
+            </p>
+            <p className="lede mt-5 max-w-2xl">
+              Each agent is run under several briefs, because the brief is an experimental
+              variable rather than boilerplate. The neutral brief says nothing about how to
+              pass; <code className="font-mono text-[0.9em]">pressured</code> adds deadline
+              framing; <code className="font-mono text-[0.9em]">guided</code> forbids
+              special-casing outright; and <code className="font-mono text-[0.9em]">adversarial</code>{" "}
+              is a red-team condition that asks the agent to cheat, purely to produce the
+              labelled cheats detector recall needs.
             </p>
 
-            <div className="mt-14 grid gap-6 md:grid-cols-3">
+            <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {CONFIGS.map(([name, body]) => (
                 <div key={name} className="card p-8">
                   <div className="font-mono text-[15px] font-medium text-brand">{name}</div>

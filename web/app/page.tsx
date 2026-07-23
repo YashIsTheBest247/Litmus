@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { ScoreStreak } from "@/components/ScoreStreak";
 import { SiteNav } from "@/components/SiteNav";
 import { FLAG_LABELS, headline, loadReport } from "@/lib/report";
+import { TELEGRAM_URL } from "@/lib/site";
 
 export default function HomePage() {
   const report = loadReport();
@@ -15,7 +16,13 @@ export default function HomePage() {
     <>
       <SiteNav />
       <main>
-        <Hero stats={stats} hasData={hasData} isMock={!!report.contains_mock_results} />
+        <Hero
+          stats={stats}
+          hasData={hasData}
+          isMock={!!report.contains_mock_results}
+          configs={report.totals.configs}
+          packs={report.totals.packs}
+        />
         <QuickStrip report={report} />
         {hasData ? (
           <>
@@ -40,10 +47,14 @@ function Hero({
   stats,
   hasData,
   isMock,
+  configs,
+  packs,
 }: {
   stats: ReturnType<typeof headline>;
   hasData: boolean;
   isMock: boolean;
+  configs: number;
+  packs: number;
 }) {
   return (
     <section
@@ -128,6 +139,15 @@ function Hero({
               <TerminalIcon />
               Inspect a patch
             </Link>
+            <a
+              href={TELEGRAM_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="pill pill-ghost-dark"
+            >
+              <TelegramIcon />
+              Chat on Telegram
+            </a>
           </div>
 
           <div
@@ -136,9 +156,13 @@ function Hero({
           >
             <span>8 static detectors</span>
             <span className="rule-v" />
-            <span>3 agent configurations</span>
+            <span>
+              {configs} agent {configs === 1 ? "configuration" : "configurations"}
+            </span>
             <span className="rule-v" />
-            <span>Held-out grading</span>
+            <span>
+              {packs} task {packs === 1 ? "pack" : "packs"}
+            </span>
             {hasData && (
               <>
                 <span className="rule-v" />
@@ -204,7 +228,8 @@ function Finding({
           below is a bug that was solvable honestly. Measured over{" "}
           {report.totals.packs} task {report.totals.packs === 1 ? "pack" : "packs"} and{" "}
           {report.totals.configs} agent{" "}
-          {report.totals.configs === 1 ? "configuration" : "configurations"}.
+          {report.totals.configs === 1 ? "configuration" : "configurations"}. Litmus was built
+          with OpenAI Codex, which is also the only agent below with no gap at all.
         </p>
 
         {incompleteRuns > 0 && (
@@ -335,6 +360,13 @@ function Leaderboard({ report }: { report: ReturnType<typeof loadReport> }) {
           Ranked by what held up, not by what was claimed.
         </h2>
 
+        <p className="lede mt-7 max-w-2xl">
+          Each row is a coding agent put through the same task packs. Litmus itself was
+          built with OpenAI Codex — which is also the only agent here with no integrity gap
+          at all. The other models are subjects under test; a benchmark that could grade only
+          one of them would not be a benchmark.
+        </p>
+
         <div className="mt-14 space-y-6">
           {report.leaderboard.map((row, i) => (
             <div key={row.agent_config} className="card p-8 sm:p-10">
@@ -345,6 +377,11 @@ function Leaderboard({ report }: { report: ReturnType<typeof loadReport> }) {
                 <span className="text-[27px] font-extrabold tracking-tight">
                   {row.agent_config}
                 </span>
+                {row.agent_config.startsWith("codex:") && (
+                  <span className="rounded-full border border-ok/30 bg-ok/8 px-3 py-1 text-[12px] font-semibold uppercase tracking-wider2 text-ok">
+                    built with · zero gap
+                  </span>
+                )}
                 {row.model && (
                   <span className="rounded-full border border-ink/10 px-3.5 py-1.5 text-[13px] font-medium text-muted">
                     {row.model}
@@ -665,6 +702,14 @@ function EmptyState() {
         </pre>
       </div>
     </section>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M21.9 4.3 18.6 20a1.2 1.2 0 0 1-1.9.7l-4.6-3.4-2.2 2.1c-.3.3-.5.5-1 .5l.4-4.9L18.4 6c.3-.3-.1-.5-.6-.2L7.6 12.2 3.1 10.8c-1-.3-1-1 .2-1.5l17.2-6.6c.8-.3 1.6.2 1.4 1.6z" />
+    </svg>
   );
 }
 

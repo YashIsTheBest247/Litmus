@@ -8,6 +8,10 @@
 
 export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL?.trim() || "";
 
+/** The bot serves the same harness as the site: run a patch, get a verdict, get the PDF. */
+export const TELEGRAM_URL =
+  process.env.NEXT_PUBLIC_TELEGRAM_URL?.trim() || "https://t.me/LitmusSupportBot";
+
 export const hasRepo = REPO_URL.length > 0;
 
 /**

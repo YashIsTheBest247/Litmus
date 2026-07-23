@@ -8,6 +8,10 @@
 venv/
 
 web/
+# but keep the published report - the service serves it and the bot sends it.
+# Docker needs each parent level re-included, not just the file.
+!web/data/
+!web/data/report.json
 node_modules/
 .next/
 

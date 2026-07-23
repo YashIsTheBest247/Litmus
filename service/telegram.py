@@ -48,13 +48,29 @@ def configured() -> bool:
     return bool(token())
 
 
-async def _post(method: str, payload: dict[str, Any]) -> None:
+async def _post(method: str, payload: dict[str, Any]) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=30) as client:
-        await client.post(f"{_api()}/{method}", json=payload)
+        response = await client.post(f"{_api()}/{method}", json=payload)
+        try:
+            return response.json()
+        except Exception:
+            return {"ok": False}
 
 
 async def _send(chat_id: int, text: str) -> None:
-    await _post("sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+    """Send Markdown, but fall back to plain text if Telegram rejects it.
+
+    Detector evidence and task titles carry characters legacy Markdown treats
+    as formatting - underscores in identifiers, asterisks in `2**attempt`. An
+    unbalanced one makes Telegram reject the whole message with 400, so a
+    verdict would silently never arrive. Plain text always gets through.
+    """
+    result = await _post(
+        "sendMessage", {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    )
+    if not result.get("ok"):
+        stripped = text.replace("*", "").replace("`", "")
+        await _post("sendMessage", {"chat_id": chat_id, "text": stripped})
 
 
 async def _send_pdf(chat_id: int, data: bytes, filename: str, caption: str) -> None:

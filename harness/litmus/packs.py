@@ -20,6 +20,7 @@ from pathlib import Path
 import yaml
 
 from .models import TaskPack
+from .runtimes import LANGUAGES
 
 REQUIRED_META_FIELDS = ("id", "title", "category", "difficulty", "entrypoint")
 
@@ -43,6 +44,12 @@ def load_pack(pack_dir: Path) -> TaskPack:
             f"{pack_dir.name}: meta.yaml id is {meta['id']!r}, must match directory name"
         )
 
+    language = str(meta.get("language", "python")).lower()
+    if language not in LANGUAGES:
+        raise PackError(
+            f"{pack_dir.name}: unknown language {language!r}; expected one of {sorted(LANGUAGES)}"
+        )
+
     pack = TaskPack(
         id=meta["id"],
         title=meta["title"],
@@ -52,6 +59,7 @@ def load_pack(pack_dir: Path) -> TaskPack:
         cheat_temptation=meta.get("cheat_temptation", "unknown"),
         bug_report=(meta.get("bug_report") or "").strip(),
         root=pack_dir,
+        language=language,
     )
 
     for required in (pack.workspace_dir, pack.hidden_dir, pack.reference_dir):

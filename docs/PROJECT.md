@@ -137,7 +137,8 @@ guarantee, not a request.
 
 | Layer | Technology |
 |---|---|
-| Harness | Python 3.12, pytest, AST analysis, subprocess sandboxing |
+| Harness | Python 3.12, subprocess sandboxing, AST analysis |
+| Test runtimes | pytest (Python), Node built-in test runner (JavaScript) |
 | Agents under test | OpenAI Codex (via `codex exec`), Google Gemini (API), OpenAI API |
 | Service | FastAPI, Uvicorn, httpx, fpdf2 (PDF), Docker |
 | Website | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS |
@@ -149,7 +150,9 @@ guarantee, not a request.
 
 ## 5. Key features
 
-- **Held-out grading** — the two-suite mechanism, enforced structurally.
+- **Held-out grading** — the two-suite mechanism, enforced structurally, and
+  language-agnostic: it works identically for Python and JavaScript packs through
+  a pluggable runtime.
 - **Four pack invariants**, checked by `litmus validate`: the buggy workspace must
   fail both suites; the reference must pass both. This is what makes a "gamed"
   verdict fair — the task was provably solvable honestly.
@@ -176,49 +179,59 @@ guarantee, not a request.
 
 ## 6. Findings
 
-Measured over **6 task packs, 7 agent configurations, 40 runs.**
+Measured over **9 task packs (8 Python, 1 JavaScript), 7 agent configurations,
+49 runs.** The two models are OpenAI Codex (via the CLI) and Gemini
+`3.1-flash-lite`.
 
 | Agent config | Reported | True | Integrity gap |
 |---|---|---|---|
 | **codex:iterative** | 100% | **100%** | **0.0** |
 | **codex:reviewed** | 100% | **100%** | **0.0** |
-| gemini:iterative | 100% | 83.3% | 16.7 |
-| gemini:pressured | 100% | 83.3% | 16.7 |
-| gemini:reviewed | 100% | 83.3% | 16.7 |
-| gemini:guided | 100% | 83.3% | 16.7 |
-| gemini:adversarial | 100% | 66.7% | 33.3 |
+| gemini:reviewed | 100% | **100%** | **0.0** |
+| gemini:iterative | 100% | 88.9% | 11.1 |
+| gemini:pressured | 100% | 88.9% | 11.1 |
+| gemini:guided | 100% | 88.9% | 11.1 |
+| gemini:adversarial | 100% | 88.9% | 11.1 |
+
+(Codex covers the two packs its remaining free-tier quota allowed; Gemini covers
+all nine.)
 
 Four results worth stating:
 
-1. **Codex was the only agent with no integrity gap.** It fixed every pack it was
-   run on — including the one built specifically to offer a shortcut — with no
-   detector findings. Litmus was itself built with Codex, so this is the tool
-   reporting on its own author, and the result is a clean pass.
+1. **Codex never gamed and never tripped a detector.** Across every pack it was
+   run on — including the one built specifically to offer a shortcut — it fixed the
+   bug with a zero integrity gap. Litmus was itself built with Codex, so this is the
+   tool reporting on its own author, and the result is a clean pass.
 
-2. **Prompt framing did not induce gaming.** The four ordinary Gemini conditions —
-   including one told "you are under deadline pressure, make the smallest change
-   you can get away with" — all landed on exactly 83.3%. And that 16.7% gap was a
-   single *incomplete* run (an honest fix that missed one edge case out of 128),
-   not a gamed one. Telling an agent to hurry did not make it cheat.
+2. **Integrity is not a fixed property of a model — it moves with the prompt, and
+   with the model's strength.** The weaker Gemini `flash-lite` gamed the
+   semantic-version pack under four of its five briefs, including the neutral and
+   the explicitly-guided ones. The one brief that produced a clean sweep was
+   `reviewed`, where a forced self-critique caught the shortcut before finishing.
+   That self-review turn is the single intervention that closed the gap.
 
-3. **Only an explicit instruction to cheat produced gaming** — and even then, 8 of
-   12 red-team attempts fixed the bug properly anyway, and 2 more were honest near
-   misses. Cheating had to be demanded, and often failed to take.
+3. **Gaming concentrates on the hardest task.** Of nine packs, only the
+   semantic-version comparator was gamed — the one where the correct behaviour is a
+   fiddly specification and the visible tests are few and enumerable. On packs whose
+   held-out suite is a round trip (CSV, Roman numerals), gaming never succeeded,
+   because when there is nothing to recognise the cheapest path to green *is* the
+   correct implementation. This is a design principle for anyone writing evals.
 
-4. **Some bugs are easier to fix than to fake.** On the CSV pack, whose held-out
-   suite is a round trip, cheating never succeeded even once — because when there
-   is nothing to recognise, the cheapest path to green *is* the correct
-   implementation. This is a design principle for anyone writing evals.
+4. **Static detectors are the cheap check, not the reliable one.** Of the gamed
+   patches, the detectors caught the blatant literal special-cases but missed the
+   subtler ones — which the held-out suite caught regardless. On one pack the cheat
+   hid its literals in a lookup table rather than an `if`, slipping past the
+   detector entirely while the held-out suite still failed it. The report states
+   this plainly rather than claiming the detectors are complete.
 
 ### The harness caught its own author
 
-Detector recall was initially computed as 50% — until inspection showed one
+An earlier run computed detector recall as 50% — until inspection showed one
 "gamed" verdict was actually the correct, idiomatic fix `min(cap, base * 2**attempt)`,
 which failed a single held-out test written with an unreasonable input. Litmus had
-called an honest patch "gamed." The fix — a fourth `incomplete` verdict and a
-corrected test — moved recall to a **true 100%** (both real cheats caught, zero
-missed) and is documented in the commit history. A benchmark that can catch its
-own author's mistakes is one worth trusting about its subjects.
+called an honest patch "gamed." The fix — a fourth `incomplete` verdict, and a
+corrected test — is documented in the commit history. A benchmark that can catch
+its own author's mistakes is one worth trusting about its subjects.
 
 ---
 
@@ -242,10 +255,12 @@ explicitly guided, and adversarial. The comparison is a genuine experiment in
 whether an agent's integrity depends on how it is asked — and Codex passes every
 one, including the pack built to bait a shortcut.
 
-**The reflexive result.** Litmus evaluates coding agents, and across the full
-benchmark Codex is the only agent with no integrity gap at all — it fixed every
-task honestly, with zero detector findings. An eval harness that names Codex the
-most trustworthy agent it tested is the heart of this submission.
+**The reflexive result.** Litmus evaluates coding agents, and across every pack
+Codex was run on it fixed the bug honestly — a zero integrity gap and no detector
+finding, including on the pack built to bait a shortcut. The weaker model tested
+alongside it gamed that same pack under most prompt framings. An eval harness,
+built with Codex, that finds Codex the most trustworthy agent it tested is the
+heart of this submission.
 
 ---
 
@@ -271,7 +286,11 @@ others:
   are enforced, but generalising the findings would need many more tasks, ideally drawn from real repositories.
 - **Packs are hand-authored**, not scraped. That is exactly what makes the four
   invariants enforceable, and it also limits how representative they are.
-- **Python only.** The harness assumes pytest.
+- **Two languages so far.** Python (pytest) and JavaScript (Node's built-in test
+  runner) are supported through a runtime abstraction; a third language is a
+  third runtime. The static detectors are strongest for Python (full AST
+  analysis) and lighter for JavaScript (text-based), though the held-out grading —
+  the primary mechanism — is fully language-agnostic.
 - **The live service runs only committed candidate patches.** Accepting arbitrary
   patches from the internet would be remote code execution as a service; that path
   exists behind an environment flag and is off by default. The container also runs

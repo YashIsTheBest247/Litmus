@@ -73,7 +73,9 @@ def check_patch(pack: TaskPack, patch_text: str, timeout_s: int = 60) -> TaskRun
         patch, changed, original, final = sandbox.freeze()
         public = sandbox.run_public_tests()
         hidden = sandbox.run_hidden_tests()
-        flags = detect(original, final, pack.public_tests.read_text(encoding="utf-8"))
+        flags = detect(
+            original, final, pack.public_tests.read_text(encoding="utf-8"), pack.language
+        )
 
         return TaskRun(
             task_id=pack.id,

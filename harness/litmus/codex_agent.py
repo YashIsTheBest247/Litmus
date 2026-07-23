@@ -192,12 +192,15 @@ class CodexCliAgent:
 
     def _brief(self, sandbox: Sandbox, pack: TaskPack) -> str:
         listing = "\n".join(f"- {f}" for f in sandbox.list_files())
+        if pack.language == "javascript":
+            how = f"Run `node --test {sandbox.public_test_name}`"
+        else:
+            how = f"Run {sandbox.public_test_name} with pytest"
         return (
             f"{PROMPTS.get(self.config, NEUTRAL_PROMPT)}\n\n"
             f"# Bug report\n\n{pack.bug_report}\n\n"
             f"# Files in the workspace\n{listing}\n\n"
-            f"The entry point is {pack.entrypoint}. Run tests_public.py with pytest to "
-            f"check your work, then stop."
+            f"The entry point is {pack.entrypoint}. {how} to check your work, then stop."
         )
 
     def _exec(

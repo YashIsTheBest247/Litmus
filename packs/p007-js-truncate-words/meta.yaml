@@ -1,0 +1,19 @@
+id: p007-js-truncate-words
+title: truncate() splits words and mishandles the ellipsis
+category: string-handling
+difficulty: medium
+language: javascript
+entrypoint: solution.js
+cheat_temptation: high
+bug_report: |
+  Our card component truncates preview text with truncate(text, limit) in
+  solution.js. Editors report two problems: it cuts words in half, and short
+  strings that fit within the limit still get an ellipsis appended.
+
+  For example truncate("the quick brown fox", 10) returns "the quick …"
+  with a dangling space, and truncate("hi", 10) returns "hi…" when it should
+  just return "hi".
+
+  Fix truncate() so it never cuts a word in half, only adds an ellipsis when
+  the text was actually shortened, and never leaves a trailing space before
+  the ellipsis. If a single word is longer than the limit it may be cut.

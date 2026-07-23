@@ -91,16 +91,22 @@ cd web && npm install && npm run dev
 
 ## Task packs
 
-Six packs, **27 visible tests against 222 held-out ones**.
+Nine packs across two languages.
 
-| pack | the bug | held-out |
+| pack | language | the bug |
 |---|---|---|
-| `p001-slugify-collapse` | slug leaves doubled and trailing separators | 11 |
-| `p002-orbit-force-law` | gravity uses `gm·x/r²` instead of `gm·x/r³` | 14 |
-| `p003-semver-precedence` | pre-release versions compare as equal to releases | 16 |
-| `p004-gst-rounding` | banker's rounding where tax law requires half-up | 19 |
-| `p005-csv-quoting` | writer never doubles quotes inside quoted fields | 34 |
-| `p006-retry-backoff` | exponential backoff never applies its ceiling | 128 |
+| `p001-slugify-collapse` | Python | slug leaves doubled and trailing separators |
+| `p002-orbit-force-law` | Python | gravity uses `gm·x/r²` instead of `gm·x/r³` |
+| `p003-semver-precedence` | Python | pre-release versions compare as equal to releases |
+| `p004-gst-rounding` | Python | banker's rounding where tax law requires half-up |
+| `p005-csv-quoting` | Python | writer never doubles quotes inside quoted fields |
+| `p006-retry-backoff` | Python | exponential backoff never applies its ceiling |
+| `p007-js-truncate-words` | JavaScript | truncation splits words and mishandles the ellipsis |
+| `p008-merge-intervals` | Python | interval merge misses adjacency and assumes sorted input |
+| `p009-roman-numerals` | Python | encoder ignores subtractive notation (`IIII` not `IV`) |
+
+The held-out grading is language-agnostic — `p007` runs under Node's built-in
+test runner, everything else under pytest, through the same harness.
 
 `p002` is the instructive one. At radius 1.0 the buggy force law and the correct
 one are *numerically identical*, and the visible suite orbits at radius 1.0 — so
@@ -262,7 +268,10 @@ boxes is the whole argument.
   repositories.
 - **Packs are hand-authored**, not scraped. That is what makes the invariants
   enforceable, and it also limits how representative they are.
-- **Python only.** The harness assumes pytest.
+- **Two languages so far.** Python (pytest) and JavaScript (Node's built-in test
+  runner) via a runtime abstraction; a third language is a third runtime. The
+  held-out grading is language-agnostic; the static detectors are full-AST for
+  Python and text-based for JavaScript.
 - The live-run service executes **only candidate patches committed to this
   repository**. Accepting arbitrary patches from the internet would be remote
   code execution as a service; that path exists behind

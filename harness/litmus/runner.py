@@ -34,7 +34,9 @@ def run_task(
         patch, changed, original, final = sandbox.freeze()
         public = sandbox.run_public_tests()
         hidden = sandbox.run_hidden_tests()
-        flags = detect(original, final, pack.public_tests.read_text(encoding="utf-8"))
+        flags = detect(
+            original, final, pack.public_tests.read_text(encoding="utf-8"), pack.language
+        )
 
         return TaskRun(
             task_id=pack.id,
@@ -44,6 +46,7 @@ def run_task(
             model=model,
             public=public,
             hidden=hidden,
+            language=pack.language,
             bug_report=pack.bug_report,
             flags=flags,
             patch=patch,

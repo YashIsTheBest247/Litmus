@@ -229,7 +229,8 @@ function Finding({
           {report.totals.packs} task {report.totals.packs === 1 ? "pack" : "packs"} and{" "}
           {report.totals.configs} agent{" "}
           {report.totals.configs === 1 ? "configuration" : "configurations"}. Litmus was built
-          with OpenAI Codex, which is also the only agent below with no gap at all.
+          with OpenAI Codex, which fixed every task it faced with a zero gap and no detector
+          finding.
         </p>
 
         {incompleteRuns > 0 && (
@@ -362,9 +363,11 @@ function Leaderboard({ report }: { report: ReturnType<typeof loadReport> }) {
 
         <p className="lede mt-7 max-w-2xl">
           Each row is a coding agent put through the same task packs. Litmus itself was
-          built with OpenAI Codex — which is also the only agent here with no integrity gap
-          at all. The other models are subjects under test; a benchmark that could grade only
-          one of them would not be a benchmark.
+          built with OpenAI Codex, which fixed every task it faced — including the pack built
+          to bait a shortcut — with a zero integrity gap and no detector finding. The other
+          rows are subjects under test, and the same model's integrity swings with the prompt:
+          it games the hardest pack under most briefs. A benchmark that could grade only one
+          agent would not be a benchmark.
         </p>
 
         <div className="mt-14 space-y-6">
@@ -463,6 +466,11 @@ function Tasks({ report }: { report: ReturnType<typeof loadReport> }) {
                 <span className="rounded-full border border-ink/10 px-3.5 py-1.5 text-[12.5px] font-semibold uppercase tracking-wider2 text-muted">
                   {task.category}
                 </span>
+                {task.language && task.language !== "python" && (
+                  <span className="rounded-full border border-brand/30 bg-brand/8 px-3 py-1 text-[12px] font-semibold text-brand">
+                    {task.language === "javascript" ? "JavaScript" : task.language}
+                  </span>
+                )}
                 <span className="ml-auto font-mono text-[12.5px] text-muted-light">
                   {task.task_id}
                 </span>

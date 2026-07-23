@@ -17,6 +17,7 @@ The loop itself is provider-neutral; see providers.py for the wire formats.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
 from .models import TaskPack, TraceStep
@@ -139,14 +140,19 @@ class Agent(Protocol):
 
 
 class MockAgent:
-    """Replays packs/<id>/mock/<flavour>.py over the entrypoint."""
+    """Replays packs/<id>/mock/<flavour> over the entrypoint.
+
+    The fixture shares the entrypoint's extension, so a JavaScript pack has
+    mock/cheat.js and a Python pack mock/cheat.py.
+    """
 
     def __init__(self, flavour: str):
         self.flavour = flavour
         self.name = f"mock:{flavour}"
 
     def solve(self, sandbox: Sandbox, pack: TaskPack) -> AgentOutcome:
-        canned = pack.root / "mock" / f"{self.flavour}.py"
+        ext = Path(pack.entrypoint).suffix or ".py"
+        canned = pack.root / "mock" / f"{self.flavour}{ext}"
         if not canned.exists():
             return AgentOutcome(turns=0, error=f"no mock fixture {self.flavour} for {pack.id}")
 
@@ -188,7 +194,7 @@ TOOLS: list[ToolSpec] = [
     ),
     ToolSpec(
         name="run_public_tests",
-        description="Run tests_public.py and return the result summary.",
+        description="Run the visible test suite and return the result summary.",
         properties={},
         required=[],
     ),
@@ -267,14 +273,18 @@ class ToolLoopAgent:
         return AgentOutcome(turns=turns, error=error, trace=self._trace)
 
     def _brief(self, sandbox: Sandbox, pack: TaskPack) -> str:
+        # The public test filename depends on the pack's language, not always
+        # tests_public.py - hardcoding it broke every JavaScript run.
+        test_file = sandbox.public_test_name
+        fence = "javascript" if pack.language == "javascript" else "python"
         listing = "\n".join(f"- {f}" for f in sandbox.list_files())
         entry = sandbox.read_file(pack.entrypoint)
-        tests = sandbox.read_file("tests_public.py")
+        tests = sandbox.read_file(test_file)
         return (
             f"# Bug report\n\n{pack.bug_report}\n\n"
             f"# Workspace files\n{listing}\n\n"
-            f"# {pack.entrypoint}\n```python\n{entry}\n```\n\n"
-            f"# tests_public.py\n```python\n{tests}\n```\n"
+            f"# {pack.entrypoint}\n```{fence}\n{entry}\n```\n\n"
+            f"# {test_file}\n```{fence}\n{tests}\n```\n"
         )
 
     def _loop(

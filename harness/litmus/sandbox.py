@@ -16,25 +16,18 @@ from __future__ import annotations
 import difflib
 import os
 import shutil
-import subprocess
-import sys
-import time
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from .models import SuiteResult, TaskPack, TestCaseResult
+from .models import SuiteResult, TaskPack
+from .runtimes import language_for
 
 DEFAULT_TIMEOUT_S = 60
-HIDDEN_TEST_NAME = "tests_hidden.py"
-LITMUS_INI = "_litmus_pytest.ini"
 
-# Never shown to the agent, never diffed.
-IGNORED_DIRS = {"__pycache__", ".pytest_cache", ".git"}
-IGNORED_NAMES = {LITMUS_INI}
+# Never shown to the agent, never diffed. Includes runner scratch files and
+# language build artifacts across the supported runtimes.
+IGNORED_DIRS = {"__pycache__", ".pytest_cache", ".git", "node_modules"}
+IGNORED_NAMES = {"_litmus_pytest.ini"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
-
-# Files that let a patch change pytest's behaviour instead of the code's.
-QUARANTINED_FOR_HIDDEN = ("conftest.py", "sitecustomize.py", "usercustomize.py")
 
 # Stripped from the subprocess environment so that patched code executing
 # inside the sandbox can never read the harness operator's credentials.
@@ -76,6 +69,11 @@ class Sandbox:
         self.frozen = False
         self._original: dict[str, str] = {}
 
+        language = language_for(pack.language)
+        self.runtime = language.runtime
+        self.public_test_name = language.public_tests
+        self.hidden_test_name = language.hidden_tests
+
     # ---------------------------------------------------------------- setup
 
     def materialize(self) -> None:
@@ -105,7 +103,7 @@ class Sandbox:
         root = self.root.resolve()
         if candidate != root and root not in candidate.parents:
             raise SandboxViolation(f"path escapes the sandbox: {rel_path}")
-        if candidate.name == HIDDEN_TEST_NAME:
+        if candidate.name == self.hidden_test_name:
             raise SandboxViolation("the held-out suite is not readable")
         return candidate
 
@@ -131,72 +129,35 @@ class Sandbox:
 
     # ------------------------------------------------------------- running
 
-    def _write_ini(self) -> None:
-        """A minimal pytest config so any ini the agent wrote is ignored."""
-        (self.root / LITMUS_INI).write_text(
-            "[pytest]\naddopts =\n", encoding="utf-8"
-        )
-
-    def _run_pytest(self, test_file: str, suite: str) -> SuiteResult:
-        self._write_ini()
-        xml_path = self.results_dir / f"{suite}.xml"
-        if xml_path.exists():
-            xml_path.unlink()
-
-        cmd = [
-            sys.executable, "-m", "pytest", test_file,
-            "-q", "--tb=line",
-            "-p", "no:cacheprovider",
-            "-c", LITMUS_INI,
-            f"--junit-xml={xml_path}",
-        ]
-
-        started = time.perf_counter()
-        timed_out = False
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=self.root,
-                env=_clean_env(),
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_s,
-            )
-            output = (proc.stdout or "") + (proc.stderr or "")
-        except subprocess.TimeoutExpired as exc:
-            timed_out = True
-            output = f"TIMEOUT after {self.timeout_s}s\n{exc.stdout or ''}{exc.stderr or ''}"
-
-        duration = time.perf_counter() - started
-        result = _parse_junit(xml_path, suite)
-        result.duration_s = duration
-        result.timed_out = timed_out
-        result.output_tail = output[-2000:]
-        if timed_out or not xml_path.exists():
-            result.collection_error = True
-        return result
-
     def run_public_tests(self) -> SuiteResult:
         """The suite the agent is allowed to iterate against."""
-        return self._run_pytest("tests_public.py", "public")
+        return self.runtime.run(
+            self.root, self.public_test_name, "public", self.timeout_s,
+            self.results_dir, _clean_env(),
+        )
 
     def run_hidden_tests(self) -> SuiteResult:
         """The held-out suite. Only callable once the patch is frozen."""
         if not self.frozen:
             raise SandboxViolation("cannot run the held-out suite before freeze()")
 
+        # Neutralise anything the agent wrote that could change the runner
+        # itself rather than the code. The set is the runtime's business.
         quarantined: list[tuple[Path, Path]] = []
-        for name in QUARANTINED_FOR_HIDDEN:
+        for name in self.runtime.quarantine:
             original = self.root / name
             if original.exists():
                 parked = self.run_root / f"_quarantined_{name}"
                 shutil.move(str(original), str(parked))
                 quarantined.append((original, parked))
 
-        hidden_target = self.root / HIDDEN_TEST_NAME
+        hidden_target = self.root / self.hidden_test_name
         shutil.copyfile(self.pack.hidden_tests, hidden_target)
         try:
-            return self._run_pytest(HIDDEN_TEST_NAME, "hidden")
+            return self.runtime.run(
+                self.root, self.hidden_test_name, "hidden", self.timeout_s,
+                self.results_dir, _clean_env(),
+            )
         finally:
             hidden_target.unlink(missing_ok=True)
             for original, parked in quarantined:
@@ -229,46 +190,3 @@ class Sandbox:
 
     def cleanup(self) -> None:
         shutil.rmtree(self.run_root, ignore_errors=True)
-
-
-def _parse_junit(xml_path: Path, suite: str) -> SuiteResult:
-    result = SuiteResult(suite=suite)
-    if not xml_path.exists():
-        result.collection_error = True
-        return result
-
-    try:
-        tree = ET.parse(xml_path)
-    except ET.ParseError:
-        result.collection_error = True
-        return result
-
-    root = tree.getroot()
-    node = root if root.tag == "testsuite" else (root.find("testsuite") or root)
-
-    for case in node.iter("testcase"):
-        name = case.get("name", "<unnamed>")
-        classname = case.get("classname", "")
-        label = f"{classname}::{name}" if classname else name
-
-        if case.find("failure") is not None:
-            child = case.find("failure")
-            status = "failed"
-        elif case.find("error") is not None:
-            child = case.find("error")
-            status = "error"
-        elif case.find("skipped") is not None:
-            child = case.find("skipped")
-            status = "skipped"
-        else:
-            child, status = None, "passed"
-
-        message = (child.get("message", "") if child is not None else "")[:400]
-        result.cases.append(TestCaseResult(name=label, status=status, message=message))
-
-    result.total = len(result.cases)
-    result.failed = sum(1 for c in result.cases if c.status == "failed")
-    result.errored = sum(1 for c in result.cases if c.status == "error")
-    result.skipped = sum(1 for c in result.cases if c.status == "skipped")
-    result.passed = result.total - result.failed - result.errored - result.skipped
-    return result

@@ -1,6 +1,12 @@
-# Live-run service. Runs pytest against patched workspaces, so it is treated
-# as a code execution sandbox rather than an ordinary web app.
+# Live-run service. Runs pytest and Node's test runner against patched
+# workspaces, so it is treated as a code execution sandbox rather than an
+# ordinary web app.
 FROM python:3.12-slim
+
+# The Node binary for JavaScript packs. node:20-bookworm-slim shares this image's
+# Debian bookworm base, so the statically-resolvable binary runs as-is - we only
+# need `node --test`, not npm. This is what lets JS packs run in the container.
+COPY --from=node:20-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -138,10 +138,11 @@ export default function MethodPage() {
             </h2>
             <p className="lede mt-7 max-w-2xl">
               Litmus was written with OpenAI Codex. Codex is also run through the same packs
-              as every other agent — and across the runs recorded here it is the only one with
-              no integrity gap: it fixed every task, including the one built to offer a
-              shortcut, without a single detector finding. That is the comparison a benchmark
-              exists to make.
+              as every other agent — and across the runs recorded here it fixed every task,
+              including the one built to offer a shortcut, with a zero integrity gap and not a
+              single detector finding. The model tested alongside it gamed the hardest pack
+              under most prompt framings. That contrast is the comparison a benchmark exists
+              to make.
             </p>
             <p className="lede mt-5 max-w-2xl">
               Each agent is run under several briefs, because the brief is an experimental

@@ -200,6 +200,7 @@ def build_report(runs_by_config: dict[str, list[TaskRun]]) -> dict[str, Any]:
                 "task_id": run.task_id,
                 "title": run.task_title,
                 "category": run.category,
+                "language": run.language,
                 "attempts": 0,
                 "gamed": 0,
                 "fixed": 0,

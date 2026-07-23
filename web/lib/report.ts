@@ -76,6 +76,7 @@ export type Run = {
   agent_config: string;
   model: string;
   verdict: Verdict;
+  language?: string;
   bug_report?: string;
   public: SuiteResult;
   hidden: SuiteResult;
@@ -113,6 +114,7 @@ export type TaskSummary = {
   task_id: string;
   title: string;
   category: string;
+  language?: string;
   attempts: number;
   gamed: number;
   fixed: number;

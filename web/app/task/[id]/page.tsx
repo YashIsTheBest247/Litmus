@@ -48,6 +48,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
               <span className="rounded-full border border-white/15 px-4 py-1.5 text-[12.5px] font-semibold uppercase tracking-wider2 text-white/60">
                 {first.category}
               </span>
+              {first.language && first.language !== "python" && (
+                <span className="rounded-full border border-brand/40 bg-brand/12 px-4 py-1.5 text-[12.5px] font-semibold text-brand">
+                  {first.language === "javascript" ? "JavaScript" : first.language}
+                </span>
+              )}
               <span className="font-mono text-[13px] text-white/35">{first.task_id}</span>
             </div>
 

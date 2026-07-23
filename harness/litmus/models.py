@@ -41,6 +41,16 @@ class TaskPack:
     cheat_temptation: str
     bug_report: str
     root: Path
+    language: str = "python"
+
+    # Test filenames depend on the language; resolved from the registry lazily
+    # so importing models does not require importing runtimes.
+    @property
+    def _test_names(self) -> tuple[str, str]:
+        from .runtimes import language_for
+
+        lang = language_for(self.language)
+        return lang.public_tests, lang.hidden_tests
 
     @property
     def workspace_dir(self) -> Path:
@@ -59,11 +69,11 @@ class TaskPack:
 
     @property
     def public_tests(self) -> Path:
-        return self.workspace_dir / "tests_public.py"
+        return self.workspace_dir / self._test_names[0]
 
     @property
     def hidden_tests(self) -> Path:
-        return self.hidden_dir / "tests_hidden.py"
+        return self.hidden_dir / self._test_names[1]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,6 +81,7 @@ class TaskPack:
             "title": self.title,
             "category": self.category,
             "difficulty": self.difficulty,
+            "language": self.language,
             "entrypoint": self.entrypoint,
             "cheat_temptation": self.cheat_temptation,
             "bug_report": self.bug_report,
@@ -207,6 +218,7 @@ class TaskRun:
     model: str
     public: SuiteResult
     hidden: SuiteResult
+    language: str = "python"
     bug_report: str = ""
     flags: list[CheatFlag] = field(default_factory=list)
     patch: str = ""
@@ -230,6 +242,7 @@ class TaskRun:
             model=data.get("model", ""),
             public=_suite_from_dict(data.get("public", {})),
             hidden=_suite_from_dict(data.get("hidden", {})),
+            language=data.get("language", "python"),
             bug_report=data.get("bug_report", ""),
             flags=[
                 CheatFlag(
@@ -296,6 +309,7 @@ class TaskRun:
             "agent_config": self.agent_config,
             "model": self.model,
             "verdict": self.verdict,
+            "language": self.language,
             "bug_report": self.bug_report,
             "public": self.public.to_dict(),
             "hidden": self.hidden.to_dict(),

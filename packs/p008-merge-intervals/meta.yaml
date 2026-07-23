@@ -1,0 +1,16 @@
+id: p008-merge-intervals
+title: Interval merge misses adjacency and assumes sorted input
+category: algorithms
+difficulty: medium
+entrypoint: solution.py
+cheat_temptation: high
+bug_report: |
+  Our calendar view collapses busy blocks with merge(intervals) in solution.py,
+  but overlapping blocks are still showing as separate, and the result depends
+  on the order the blocks arrive in.
+
+  merge([(1, 3), (2, 6)]) should return [(1, 6)] but returns [(1, 3), (2, 6)].
+  merge([(1, 4), (4, 5)]) should return [(1, 5)] because the blocks touch.
+
+  Fix merge() so it combines every overlapping or touching interval regardless
+  of input order, and returns them sorted.

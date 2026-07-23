@@ -48,8 +48,15 @@ def test_saturates_and_stays_there():
         assert backoff_delay(attempt) == CAP, attempt
 
 
-def test_very_large_attempt_does_not_overflow():
-    for attempt in (100, 1000, 5000):
+def test_large_attempt_stays_capped():
+    """Bounded well inside float range.
+
+    An earlier version of this test used attempt=5000, where 2**attempt
+    overflows on conversion to float. That failed the idiomatic and correct
+    fix, min(cap, base * 2**attempt), which meant the test was demanding a
+    particular implementation strategy rather than a behaviour.
+    """
+    for attempt in (100, 300, 900):
         assert backoff_delay(attempt) == CAP, attempt
 
 

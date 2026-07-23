@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -27,9 +27,23 @@ from litmus.agents import MockAgent
 from litmus.check import check_patch
 from litmus.packs import PackError, load_all
 from litmus.runner import run_task
+from service.telegram import configured as telegram_configured
+from service.telegram import handle_update, load_published_report
+from service.telegram import secret as telegram_secret
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# Load .env before anything reads the environment, so the service behaves the
+# same locally as it does with dashboard-configured variables in production.
+try:
+    from litmus.cli import load_env_file
+
+    load_env_file(REPO_ROOT / ".env")
+except Exception:  # pragma: no cover - never block startup on this
+    pass
+
 PACKS_ROOT = Path(os.environ.get("LITMUS_PACKS", REPO_ROOT / "packs"))
+REPORT_PATH = Path(os.environ.get("LITMUS_REPORT", REPO_ROOT / "web" / "data" / "report.json"))
 ALLOW_CUSTOM_PATCH = os.environ.get("LITMUS_ALLOW_CUSTOM_PATCH") == "1"
 MAX_PATCH_BYTES = 20_000
 
@@ -73,7 +87,13 @@ def _find(pack_id: str):
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "packs": len(_packs()), "custom_patch": ALLOW_CUSTOM_PATCH}
+    return {
+        "ok": True,
+        "packs": len(_packs()),
+        "custom_patch": ALLOW_CUSTOM_PATCH,
+        "telegram": telegram_configured(),
+        "report": REPORT_PATH.exists(),
+    }
 
 
 @app.get("/api/packs")
@@ -123,6 +143,54 @@ def run_candidate(request: RunRequest) -> dict:
 
     run = run_task(MockAgent(request.candidate), pack, model="candidate", timeout_s=60)
     return run.to_dict()
+
+
+@app.get("/api/report.pdf")
+def report_pdf():
+    """The published report as a shareable PDF."""
+    from fastapi.responses import Response
+
+    from litmus.pdfreport import build_pdf
+
+    report = load_published_report(REPORT_PATH)
+    if not report:
+        raise HTTPException(status_code=404, detail="no report has been published")
+
+    return Response(
+        content=build_pdf(report),
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="litmus-report.pdf"'},
+    )
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(update: dict, request: Request):
+    """Telegram calls this. Always answers 200 so it does not retry forever."""
+    if not telegram_configured():
+        raise HTTPException(status_code=404, detail="telegram is not configured")
+
+    # Telegram echoes this header back on every call; without it the endpoint
+    # is an open invitation to spoof updates.
+    expected = telegram_secret()
+    if expected:
+        sent = request.headers.get("x-telegram-bot-api-secret-token", "")
+        if sent != expected:
+            raise HTTPException(status_code=403, detail="bad secret token")
+
+    from litmus.pdfreport import build_pdf
+
+    await handle_update(
+        update,
+        {
+            "list_packs": lambda: list_packs()["packs"],
+            "run_candidate": lambda pack_id, candidate: run_candidate(
+                RunRequest(pack_id=pack_id, candidate=candidate)
+            ),
+            "load_report": lambda: load_published_report(REPORT_PATH),
+            "build_pdf": build_pdf,
+        },
+    )
+    return {"ok": True}
 
 
 class PatchRequest(BaseModel):

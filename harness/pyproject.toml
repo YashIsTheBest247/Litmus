@@ -12,6 +12,7 @@ dependencies = [
 openai = ["openai>=1.40"]
 gemini = ["google-genai>=1.0"]
 agents = ["openai>=1.40", "google-genai>=1.0"]
+pdf = ["fpdf2>=2.7"]
 
 [project.scripts]
 litmus = "litmus.cli:main"

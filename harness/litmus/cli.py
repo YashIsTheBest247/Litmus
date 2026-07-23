@@ -221,6 +221,17 @@ def cmd_report(args) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"\nmerged {len(seen)} runs into {out}" + (f" ({dropped} dropped)" if dropped else ""))
+
+    if args.pdf:
+        try:
+            from .pdfreport import build_pdf
+        except ImportError:
+            sys.exit("PDF output needs fpdf2 - pip install 'litmus[pdf]'")
+        pdf_path = Path(args.pdf)
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(build_pdf(report))
+        print(f"wrote {pdf_path}")
+
     return 0
 
 
@@ -337,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
         "masquerade as a zero score",
     )
     report.add_argument("--drop-mock", action="store_true", help="exclude fixture runs")
+    report.add_argument("--pdf", help="also write a shareable PDF report here")
     report.set_defaults(func=cmd_report)
 
     new_pack = sub.add_parser("new-pack", help="scaffold a new task pack")

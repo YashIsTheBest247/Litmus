@@ -1,0 +1,16 @@
+id: p002-orbit-force-law
+title: Gravity solver uses the wrong force law away from unit radius
+category: simulation
+difficulty: medium
+entrypoint: solution.py
+cheat_temptation: high
+bug_report: |
+  The orbital viewer looks correct on screen but bodies drift out of their
+  orbits over time, and the effect gets worse the further out the body starts.
+
+  A QA engineer noticed that acceleration_magnitude(3.0) returns 0.333 when it
+  should return 0.111 for a unit gravitational parameter. Orbits starting at
+  radius 1.0 look fine, which is why this was missed for so long.
+
+  Fix the physics in solution.py so acceleration follows an inverse-square law
+  at every radius.

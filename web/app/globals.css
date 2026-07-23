@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Route changes fade rather than snapping.
+     Deliberately opacity-only: any transform here would make this wrapper the
+     containing block for the fixed navbar, which would then scroll away with
+     the page instead of staying pinned. */
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .page-enter {
+    animation: page-enter 0.35s ease-out both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    .page-enter,
+    .animate-rise,
+    .animate-grow {
+      animation: none !important;
+    }
+  }
+
+  /* Enough to clear the floating nav and no more - each section already
+     carries its own top padding, and the two stack when you jump to an
+     anchor. */
+  section[id],
+  [id] {
+    scroll-margin-top: 2.5rem;
+  }
+
+  body {
+    @apply bg-white font-sans text-ink antialiased;
+  }
+
+  ::selection {
+    @apply bg-ink text-white;
+  }
+}
+
+@layer components {
+  /* --- section shells ------------------------------------------------ */
+
+  .band-dark {
+    @apply bg-ink text-white;
+  }
+
+  .band-light {
+    @apply bg-white text-ink;
+  }
+
+  .band-mist {
+    @apply bg-mist text-ink;
+  }
+
+  .shell {
+    @apply mx-auto w-full max-w-[1180px] px-6;
+  }
+
+  /* --- the floating pill nav ----------------------------------------- */
+
+  .nav-shell {
+    @apply flex w-full items-center gap-1 rounded-full py-2.5 pl-5 pr-2.5 transition-all duration-300;
+  }
+
+  .nav-on-dark {
+    @apply bg-ink/70 text-white backdrop-blur-2xl;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+      0 20px 50px -20px rgba(0, 0, 0, 0.8);
+  }
+
+  .nav-on-light {
+    @apply bg-white/90 text-ink backdrop-blur-2xl shadow-pill;
+  }
+
+  /* --- pills ---------------------------------------------------------- */
+
+  .pill {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[15px] font-medium transition-all;
+  }
+
+  .pill-solid-light {
+    @apply bg-white text-ink hover:-translate-y-0.5;
+  }
+
+  .pill-solid-dark {
+    @apply bg-ink text-white hover:-translate-y-0.5;
+  }
+
+  .pill-ghost-dark {
+    @apply border border-white/20 text-white hover:border-white/45;
+  }
+
+  .pill-ghost-light {
+    @apply border border-ink/12 text-ink hover:border-ink/30;
+  }
+
+  /* --- chips ---------------------------------------------------------- */
+
+  .chip {
+    @apply inline-flex items-center rounded-full border border-ink/12 bg-white px-5 py-2.5 text-[15px] text-ink;
+  }
+
+  .rule-v {
+    @apply h-3.5 w-px shrink-0 bg-white/15;
+  }
+
+  /* --- cards ---------------------------------------------------------- */
+
+  .card {
+    @apply rounded-4xl border border-ink/8 bg-white shadow-card;
+  }
+
+  .card-dark {
+    @apply rounded-4xl border border-white/10 bg-white/[0.04];
+  }
+
+  /* --- type ----------------------------------------------------------- */
+
+  .h-display {
+    @apply font-sans font-extrabold tracking-tightest;
+  }
+
+  .eyebrow {
+    @apply text-[12.5px] font-semibold uppercase tracking-wider2 text-muted;
+  }
+
+  .lede {
+    @apply text-[19px] leading-[1.65] text-muted;
+  }
+}
+
+/* --- diff rendering --------------------------------------------------- */
+
+.diff-line {
+  @apply block whitespace-pre px-6 font-mono text-[12.5px] leading-[1.8];
+}
+.diff-add {
+  @apply bg-ok/10 text-white;
+}
+.diff-del {
+  @apply bg-white/4 text-white/40;
+}
+.diff-meta {
+  @apply bg-white/4 text-white/35;
+}
+.diff-flagged {
+  @apply bg-bad/25 text-white;
+  box-shadow: inset 3px 0 0 0 #e11d48;
+}

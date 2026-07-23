@@ -1,0 +1,19 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# node
+node_modules/
+.next/
+out/
+.vercel/
+
+# local
+.env
+.env.local
+runs/tmp/
+*.log

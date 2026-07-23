@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { Footer } from "@/components/Footer";
 import { SiteNav } from "@/components/SiteNav";
+import { WakeSequence } from "@/components/WakeSequence";
 import { API_URL, hasLiveRun } from "@/lib/site";
 import type { Run } from "@/lib/report";
 
@@ -120,17 +121,13 @@ export default function TryPage() {
 
         {hasLiveRun && waking && (
           <section className="band-light py-16">
-            <div className="shell flex items-center gap-4">
-              <span className="h-5 w-5 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
-              <p className="text-[16px] text-muted">
-                Waking the run service — free hosting sleeps when idle, so this takes about
-                a minute the first time.
-              </p>
+            <div className="shell">
+              <WakeSequence />
             </div>
           </section>
         )}
 
-        {hasLiveRun && (
+        {hasLiveRun && !waking && (
           <section className="band-light py-16">
             <div className="shell">
               {packs.length > 1 && (
@@ -202,8 +199,15 @@ export default function TryPage() {
                               {candidate.description}
                             </span>
                           </span>
-                          <span className="shrink-0 text-[14px] font-semibold text-ink">
-                            {running === candidate.id ? "Running…" : "Run →"}
+                          <span className="flex shrink-0 items-center gap-2 text-[14px] font-semibold text-ink">
+                            {running === candidate.id ? (
+                              <>
+                                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
+                                Running
+                              </>
+                            ) : (
+                              "Run →"
+                            )}
                           </span>
                         </button>
                       ))}

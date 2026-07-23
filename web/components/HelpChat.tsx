@@ -109,7 +109,14 @@ export function HelpChat() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([INTRO]);
   const [input, setInput] = useState("");
+  // Blinks twice on mount (every page load), then rests once opened.
+  const [blinking, setBlinking] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setBlinking(false), 2200);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -193,10 +200,19 @@ export function HelpChat() {
 
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => !o);
+          setBlinking(false);
+        }}
         aria-label={open ? "Close help" : "Ask about Litmus"}
-        className="fixed bottom-5 right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-ink text-white shadow-lift transition-transform duration-300 hover:scale-105"
+        className={`fixed bottom-5 right-5 z-[60] flex h-14 w-14 items-center justify-center rounded-full bg-ink text-white shadow-lift transition-transform duration-300 hover:scale-105 ${
+          blinking && !open ? "help-blink" : ""
+        }`}
       >
+        {/* An expanding ring accompanies the two attention pulses on load. */}
+        {blinking && !open && (
+          <span className="help-ring pointer-events-none absolute inset-0 rounded-full border-2 border-ink" />
+        )}
         {/* The icon rotates a quarter turn and crossfades chat -> X on toggle. */}
         <span
           className="relative flex h-6 w-6 items-center justify-center transition-transform duration-300"
@@ -215,14 +231,16 @@ export function HelpChat() {
 }
 
 function ChatIcon() {
+  // A rounded speech bubble with a tail, matching the reference mark.
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-4 4v-4H5.5A1.5 1.5 0 0 1 4 14.5z"
+        d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5c-1 0-2-.2-2.9-.6L4.5 20l1.1-4.6A7.5 7.5 0 1 1 20 11.5z"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinejoin="round"
       />
+      <circle cx="12" cy="11.5" r="1.15" fill="currentColor" />
     </svg>
   );
 }

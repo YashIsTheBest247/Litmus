@@ -65,6 +65,96 @@ class ProviderError(RuntimeError):
     """Configuration or transport failure that should abort the run cleanly."""
 
 
+def load_gemini_keys() -> list[str]:
+    """Collect every Gemini key the environment offers, in a stable order.
+
+    Accepts GEMINI_API_KEYS as a comma or whitespace separated list, the
+    singular GEMINI_API_KEY, numbered GEMINI_API_KEY_1..N, and GOOGLE_API_KEY.
+    Each key carries its own free-tier allowance, so several of them is the
+    difference between a run that finishes and one that stops halfway.
+    """
+    found: list[str] = []
+
+    bulk = os.environ.get("GEMINI_API_KEYS", "")
+    found.extend(part.strip() for part in re.split(r"[,\s]+", bulk) if part.strip())
+
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            found.append(value)
+
+    index = 1
+    while True:
+        value = (os.environ.get(f"GEMINI_API_KEY_{index}") or "").strip()
+        if not value:
+            break
+        found.append(value)
+        index += 1
+
+    seen: set[str] = set()
+    ordered = []
+    for key in found:
+        if key not in seen:
+            seen.add(key)
+            ordered.append(key)
+    return ordered
+
+
+class KeyPool:
+    """Rotates through API keys, retiring any that run out for the day."""
+
+    def __init__(self, keys: list[str]):
+        if not keys:
+            raise ProviderError(
+                "no Gemini key found - set GEMINI_API_KEY, or GEMINI_API_KEYS for several"
+            )
+        self._keys = keys
+        self._index = 0
+        self._retired: set[int] = set()
+
+    @property
+    def size(self) -> int:
+        return len(self._keys)
+
+    @property
+    def remaining(self) -> int:
+        return len(self._keys) - len(self._retired)
+
+    def current(self) -> str:
+        return self._keys[self._index]
+
+    def label(self) -> str:
+        return f"key {self._index + 1}/{len(self._keys)}"
+
+    def retire_and_rotate(self) -> bool:
+        """Drop the current key and move to the next live one."""
+        self._retired.add(self._index)
+        for offset in range(1, len(self._keys) + 1):
+            candidate = (self._index + offset) % len(self._keys)
+            if candidate not in self._retired:
+                self._index = candidate
+                return True
+        return False
+
+
+# One pool per process, so every task in a run shares the rotation state
+# instead of each starting again on an already-exhausted key.
+_POOL: KeyPool | None = None
+
+
+def gemini_pool() -> KeyPool:
+    global _POOL
+    if _POOL is None:
+        _POOL = KeyPool(load_gemini_keys())
+    return _POOL
+
+
+def reset_gemini_pool() -> None:
+    """Test hook."""
+    global _POOL
+    _POOL = None
+
+
 class _Pacer:
     """Spaces requests so a run stays under a requests-per-minute ceiling."""
 
@@ -203,6 +293,13 @@ GEMINI_DEFAULT_MODEL = "gemini-3.5-flash"
 
 
 class GeminiConversation:
+    """Drives Gemini with history held here rather than inside the SDK client.
+
+    `chats.create` keeps the transcript on the client object, which would make
+    swapping API keys mid-conversation lose everything said so far. Owning the
+    contents list means rotating to a fresh key is just building a new client.
+    """
+
     def __init__(self, model: str, system: str, tools: list[ToolSpec], rpm: int = DEFAULT_RPM):
         try:
             from google import genai
@@ -212,13 +309,12 @@ class GeminiConversation:
                 "the google-genai package is not installed - pip install 'litmus[gemini]'"
             ) from exc
 
-        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if not key:
-            raise ProviderError("GEMINI_API_KEY is not set")
-
+        self._genai = genai
         self._types = types
-        self._client = genai.Client(api_key=key)
+        self._model = model
+        self._pool = gemini_pool()
         self._pacer = _Pacer(rpm)
+        self._contents: list[Any] = []
 
         declarations = [
             types.FunctionDeclaration(
@@ -233,13 +329,34 @@ class GeminiConversation:
             for t in tools
         ]
 
-        config = types.GenerateContentConfig(
+        self._config = types.GenerateContentConfig(
             system_instruction=system,
             tools=[types.Tool(function_declarations=declarations)],
             # We drive the loop ourselves; the SDK must not execute anything.
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
-        self._chat = self._client.chats.create(model=model, config=config)
+
+    def _generate(self) -> Any:
+        """Call the model, rotating keys when one is out of quota for the day."""
+        while True:
+            client = self._genai.Client(api_key=self._pool.current())
+            try:
+                return _call_with_retry(
+                    self._pacer,
+                    lambda: client.models.generate_content(
+                        model=self._model, contents=self._contents, config=self._config
+                    ),
+                )
+            except ProviderError as exc:
+                exhausted = "daily" in str(exc) and "quota" in str(exc)
+                if not exhausted:
+                    raise
+                spent = self._pool.label()
+                if not self._pool.retire_and_rotate():
+                    raise ProviderError(
+                        f"every Gemini key is out of daily quota ({self._pool.size} tried)"
+                    ) from exc
+                print(f"    [{spent} exhausted, switching to {self._pool.label()}]")
 
     def _reply_from(self, response: Any) -> Reply:
         calls: list[ToolCall] = []
@@ -264,12 +381,21 @@ class GeminiConversation:
                 text = ""
         return Reply(text=text, calls=calls)
 
-    def _send(self, message: Any) -> Reply:
-        response = _call_with_retry(self._pacer, lambda: self._chat.send_message(message))
+    def _turn(self, content: Any) -> Reply:
+        self._contents.append(content)
+        response = self._generate()
+
+        # Keep the model's own turn in history so the next call has context.
+        candidates = getattr(response, "candidates", None) or []
+        if candidates and getattr(candidates[0], "content", None) is not None:
+            self._contents.append(candidates[0].content)
+
         return self._reply_from(response)
 
     def send_user(self, text: str) -> Reply:
-        return self._send(text)
+        return self._turn(
+            self._types.Content(role="user", parts=[self._types.Part.from_text(text=text)])
+        )
 
     def send_tool_results(self, results: list[ToolResult]) -> Reply:
         parts = [
@@ -278,7 +404,7 @@ class GeminiConversation:
             )
             for result in results
         ]
-        return self._send(parts)
+        return self._turn(self._types.Content(role="user", parts=parts))
 
 
 # ---------------------------------------------------------------- factory

@@ -169,6 +169,7 @@ export function headline(report: Report) {
 
 export const FLAG_LABELS: Record<string, string> = {
   TEST_FILE_MODIFIED: "Edited the test file",
+  TEST_FILE_EXTENDED: "Added tests of its own",
   TEST_FUNCTION_REMOVED: "Deleted a test",
   SKIP_MARKER_ADDED: "Silenced a test",
   ASSERTION_WEAKENED: "Weakened an assertion",

@@ -88,7 +88,7 @@ export function RedTeamPanel({ data }: { data?: RedTeam }) {
         <Metric label="Recall" value={`${data.recall}%`} big />
       </div>
 
-      {(data.fixed_anyway > 0 || data.failed_to_cheat > 0) && (
+      {(data.fixed_anyway > 0 || data.failed_to_cheat > 0 || (data.incomplete ?? 0) > 0) && (
         <p className="mt-8 max-w-2xl text-[15.5px] leading-relaxed text-muted">
           {data.fixed_anyway > 0 && (
             <>
@@ -98,10 +98,14 @@ export function RedTeamPanel({ data }: { data?: RedTeam }) {
               </strong>{" "}
             </>
           )}
-          {data.failed_to_cheat > 0 && (
+          {(data.incomplete ?? 0) > 0 && (
             <>
-              {data.failed_to_cheat} could not turn the visible suite green at all.
+              {data.incomplete} produced a real fix that missed an edge case, which is
+              counted separately rather than as a cheat.{" "}
             </>
+          )}
+          {data.failed_to_cheat > 0 && (
+            <>{data.failed_to_cheat} could not turn the visible suite green at all.</>
           )}
         </p>
       )}
@@ -200,6 +204,7 @@ export function ConsistencyPanel({ rows }: { rows: ConsistencyRow[] }) {
               <span className="ml-auto text-[14px] text-muted">
                 <span className="font-bold text-ok">{row.fixed}</span> fixed ·{" "}
                 <span className="font-bold text-bad">{row.gamed}</span> gamed ·{" "}
+                <span className="font-bold text-warn">{row.incomplete ?? 0}</span> partial ·{" "}
                 <span className="font-bold text-muted">{row.failed}</span> failed
                 <span className="ml-2 text-muted-light">of {row.attempts}</span>
               </span>

@@ -21,7 +21,12 @@ from .validate import validate_pack
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PACKS = REPO_ROOT / "packs"
 
-VERDICT_MARK = {"fixed": "FIXED", "gamed": "GAMED", "failed": "failed"}
+VERDICT_MARK = {
+    "fixed": "FIXED",
+    "gamed": "GAMED",
+    "incomplete": "part",
+    "failed": "failed",
+}
 
 
 def load_env_file(path: Path = REPO_ROOT / ".env") -> None:
@@ -81,7 +86,7 @@ def _print_run(run: TaskRun, attempt: int | None = None) -> None:
     mark = VERDICT_MARK[run.verdict]
     label = f"{run.task_id} #{attempt}" if attempt else run.task_id
     print(
-        f"  {mark:<5}  {label:<30} "
+        f"  {mark:<6}  {label:<30} "
         f"public {run.public.passed}/{run.public.total}  "
         f"hidden {run.hidden.passed}/{run.hidden.total}  "
         f"flags {len(run.flags)}"

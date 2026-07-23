@@ -68,7 +68,12 @@ async def _send_pdf(chat_id: int, data: bytes, filename: str, caption: str) -> N
 
 def _format_run(run: dict[str, Any]) -> str:
     verdict = run["verdict"]
-    mark = {"fixed": "held up", "gamed": "GAMED", "failed": "did not go green"}[verdict]
+    mark = {
+        "fixed": "held up",
+        "gamed": "GAMED",
+        "incomplete": "nearly - missed an edge case",
+        "failed": "did not go green",
+    }[verdict]
 
     lines = [
         f"*{run['task_title']}*",

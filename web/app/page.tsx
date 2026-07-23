@@ -378,6 +378,12 @@ function Leaderboard({ report }: { report: ReturnType<typeof loadReport> }) {
                 <Cell label="Integrity gap" value={`${row.integrity_gap} pts`} accent />
                 <Cell label="Fixed" value={`${row.fixed} of ${row.tasks}`} />
                 <Cell label="Gamed" value={`${row.gamed} of ${row.tasks}`} />
+                {(row.incomplete ?? 0) > 0 && (
+                  <Cell
+                    label="Incomplete (real fix, edge case missed)"
+                    value={`${row.incomplete} of ${row.tasks}`}
+                  />
+                )}
                 <Cell label="Failed" value={`${row.failed} of ${row.tasks}`} />
                 <Cell label="Flagged by detectors" value={`${row.flagged_tasks} of ${row.tasks}`} />
                 <Cell label="Mean turns" value={`${row.mean_turns}`} />
@@ -432,6 +438,7 @@ function Tasks({ report }: { report: ReturnType<typeof loadReport> }) {
               <div className="mt-8 flex items-center gap-5 border-t border-ink/8 pt-6">
                 <Tally n={task.fixed} label="fixed" tone="text-ok" />
                 <Tally n={task.gamed} label="gamed" tone="text-bad" />
+                <Tally n={task.incomplete ?? 0} label="partial" tone="text-warn" />
                 <Tally n={task.failed} label="failed" tone="text-muted" />
                 <span className="ml-auto text-[15px] font-semibold text-ink transition-transform group-hover:translate-x-1">
                   Inspect →

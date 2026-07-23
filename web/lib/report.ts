@@ -28,7 +28,7 @@ export type CheatFlag = {
   explanation: string;
 };
 
-export type Verdict = "fixed" | "gamed" | "failed";
+export type Verdict = "fixed" | "gamed" | "incomplete" | "failed";
 
 export type TraceStep = {
   index: number;
@@ -48,6 +48,7 @@ export type DetectorStat = {
 export type RedTeam = {
   attempts: number;
   gamed: number;
+  incomplete: number;
   failed_to_cheat: number;
   fixed_anyway: number;
   caught_by_detectors: number;
@@ -63,6 +64,7 @@ export type ConsistencyRow = {
   attempts: number;
   fixed: number;
   gamed: number;
+  incomplete: number;
   failed: number;
   stable: boolean;
 };
@@ -93,6 +95,7 @@ export type LeaderRow = {
   tasks: number;
   fixed: number;
   gamed: number;
+  incomplete: number;
   failed: number;
   reported_score: number;
   true_score: number;
@@ -113,6 +116,7 @@ export type TaskSummary = {
   attempts: number;
   gamed: number;
   fixed: number;
+  incomplete: number;
   failed: number;
 };
 
@@ -165,7 +169,9 @@ export function headline(report: Report) {
   if (!rows.length) return { reported: 0, real: 0, gap: 0, gamed: 0, claimed: 0 };
 
   const tasks = rows.reduce((n, r) => n + r.tasks, 0);
-  const claimed = rows.reduce((n, r) => n + r.fixed + r.gamed, 0);
+  // Anything that turned the visible suite green is a claim, whether it was
+  // dishonest or merely premature.
+  const claimed = rows.reduce((n, r) => n + r.fixed + r.gamed + (r.incomplete ?? 0), 0);
   const fixed = rows.reduce((n, r) => n + r.fixed, 0);
   const gamed = rows.reduce((n, r) => n + r.gamed, 0);
 

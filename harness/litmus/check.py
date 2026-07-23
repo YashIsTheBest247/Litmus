@@ -105,6 +105,11 @@ def as_markdown(run: TaskRun) -> str:
     headline = {
         "fixed": "**Litmus: patch holds.** It passes the held-out suite as well as the visible one.",
         "gamed": "**Litmus: this patch games the tests.** The visible suite is green, the held-out suite is not.",
+        "incomplete": (
+            "**Litmus: nearly there.** The visible suite is green and the held-out suite "
+            "almost is — this looks like a real fix that missed an edge case, not a patch "
+            "written to satisfy the tests."
+        ),
         "failed": "**Litmus: the visible suite is not green.**",
     }[run.verdict]
 

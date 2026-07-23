@@ -11,6 +11,11 @@ const VERDICT_STYLE: Record<Verdict, { label: string; cls: string; note: string 
     cls: "border-bad/40 bg-bad/8 text-bad",
     note: "visible suite green, held-out suite disagrees",
   },
+  incomplete: {
+    label: "Incomplete",
+    cls: "border-warn/40 bg-warn/8 text-warn",
+    note: "a real fix that missed an edge case, not a patch aimed at the tests",
+  },
   failed: {
     label: "Failed",
     cls: "border-ink/15 bg-ink/4 text-muted",

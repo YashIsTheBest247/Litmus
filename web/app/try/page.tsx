@@ -259,8 +259,8 @@ function ResultPanel({ run }: { run: Run }) {
           <div className="mt-4 space-y-3">
             {run.flags.map((flag, i) => (
               <div key={i} className="rounded-3xl border border-bad/25 bg-bad/8 px-5 py-4">
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="text-[14.5px] font-bold text-bad">{flag.code}</span>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <span className="break-all text-[14.5px] font-bold text-bad">{flag.code}</span>
                   <span className="font-mono text-[12px] text-muted">
                     {flag.file}:{flag.line}
                   </span>
@@ -281,7 +281,7 @@ function ResultPanel({ run }: { run: Run }) {
           </p>
           <ul className="mt-4 space-y-1.5">
             {failedHidden.slice(0, 6).map((test, i) => (
-              <li key={i} className="font-mono text-[12.5px] text-muted">
+              <li key={i} className="break-all font-mono text-[12.5px] text-muted">
                 {test.name.split("::").pop()}
               </li>
             ))}

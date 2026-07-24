@@ -153,7 +153,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                       The patch
                     </span>
                     {run.files_changed.map((f) => (
-                      <span key={f} className="font-mono text-[12.5px] text-white/45">
+                      <span key={f} className="break-all font-mono text-[12.5px] text-white/45">
                         {f}
                       </span>
                     ))}

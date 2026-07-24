@@ -131,12 +131,23 @@ export function SiteNav() {
           </button>
         </nav>
 
-        {menuOpen && (
-          <div
-            className={`mt-2 rounded-4xl border p-3 backdrop-blur-2xl lg:hidden ${
-              onLight ? "border-ink/10 bg-white/95 shadow-pill" : "border-white/12 bg-ink/90"
-            }`}
-          >
+        {/* Animated open/close. The 0fr -> 1fr grid row transitions to the
+            content's natural height, which a plain `hidden` toggle cannot do
+            and a fixed max-height would only approximate. */}
+        <div
+          className={`grid transition-all duration-300 ease-out lg:hidden ${
+            menuOpen
+              ? "mt-2 grid-rows-[1fr] opacity-100"
+              : "pointer-events-none grid-rows-[0fr] opacity-0"
+          }`}
+          aria-hidden={!menuOpen}
+        >
+          <div className="overflow-hidden">
+            <div
+              className={`rounded-4xl border p-3 backdrop-blur-2xl ${
+                onLight ? "border-ink/10 bg-white/95 shadow-pill" : "border-white/12 bg-ink/90"
+              }`}
+            >
             {LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -163,13 +174,14 @@ export function SiteNav() {
               Detectors
             </Link>
 
-            {/* The primary action, highlighted and full-width. */}
-            {primaryCta(
-              "mt-2 flex items-center justify-center gap-1.5 rounded-3xl px-5 py-4 text-[16px] font-semibold " +
-                (onLight ? "bg-ink text-white" : "bg-white text-ink"),
-            )}
+              {/* The primary action, highlighted and full-width. */}
+              {primaryCta(
+                "mt-2 flex items-center justify-center gap-1.5 rounded-3xl px-5 py-4 text-[16px] font-semibold " +
+                  (onLight ? "bg-ink text-white" : "bg-white text-ink"),
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

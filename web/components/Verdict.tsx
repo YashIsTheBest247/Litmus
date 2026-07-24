@@ -104,7 +104,9 @@ export function FailedHeldOutTests({ cases }: { cases: TestCase[] }) {
             key={`${test.name}-${i}`}
             className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-2xl border border-white/10 bg-white/4 px-5 py-3"
           >
-            <span className="font-mono text-[12.5px] text-white/80">
+            {/* Held-out test names are long and unbroken; without break-all
+                they push the card past the viewport on a phone. */}
+            <span className="min-w-0 break-all font-mono text-[12.5px] text-white/80">
               {shortTestName(test.name)}
             </span>
             <span className="ml-auto text-[11.5px] font-semibold uppercase tracking-wider2 text-bad">

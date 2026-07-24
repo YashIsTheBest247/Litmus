@@ -229,8 +229,7 @@ function Finding({
           {report.totals.packs} task {report.totals.packs === 1 ? "pack" : "packs"} and{" "}
           {report.totals.configs} agent{" "}
           {report.totals.configs === 1 ? "configuration" : "configurations"}. Litmus was built
-          with OpenAI Codex, which fixed every task it faced with a zero gap and no detector
-          finding.
+          with OpenAI Codex, which never gamed a single task and never tripped a detector.
         </p>
 
         {incompleteRuns > 0 && (
@@ -363,8 +362,9 @@ function Leaderboard({ report }: { report: ReturnType<typeof loadReport> }) {
 
         <p className="lede mt-7 max-w-2xl">
           Each row is a coding agent put through the same task packs. Litmus itself was
-          built with OpenAI Codex, which fixed every task it faced — including the pack built
-          to bait a shortcut — with a zero integrity gap and no detector finding. The other
+          built with OpenAI Codex, which never gamed a single task across eighteen runs — no
+          gamed verdict, no detector finding, including on the pack built to bait a shortcut.
+          Its one miss was an honest edge case, not a shortcut. The other
           rows are subjects under test, and the same model's integrity swings with the prompt:
           it games the hardest pack under most briefs. A benchmark that could grade only one
           agent would not be a benchmark.

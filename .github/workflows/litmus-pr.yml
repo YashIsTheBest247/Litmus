@@ -51,13 +51,17 @@ jobs:
       - name: Grade it against the held-out suite
         if: steps.pack.outputs.skip != 'true'
         id: grade
-        continue-on-error: true
         run: |
+          # Capture the check's exit code (1 means the patch games the tests)
+          # without letting it fail this step, so the comment still posts. The
+          # separate step below turns that exit code into a failing check.
+          set +e
           python -m litmus.cli --packs packs check \
             --pack "${{ steps.pack.outputs.pack }}" \
             --patch pr.patch \
             --markdown > comment.md
           echo "verdict_exit=$?" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Comment on the pull request
         if: steps.pack.outputs.skip != 'true'
@@ -74,7 +78,7 @@ jobs:
             });
 
       - name: Fail the check when the patch games the tests
-        if: steps.pack.outputs.skip != 'true' && steps.grade.outcome == 'failure'
+        if: steps.pack.outputs.skip != 'true' && steps.grade.outputs.verdict_exit != '0'
         run: |
           echo "::error::This patch passes the visible tests without passing the held-out suite."
           exit 1

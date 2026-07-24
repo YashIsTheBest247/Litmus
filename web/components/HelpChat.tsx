@@ -4,6 +4,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { Mark } from "@/components/Mark";
 import { OVERVIEW_ID, KNOWLEDGE, retrieve } from "@/lib/knowledge";
+import {
+  cancelSpeech,
+  createRecognition,
+  primeVoices,
+  recognitionSupported,
+  speak,
+  speechSupported,
+  transcriptFrom,
+} from "@/lib/voice";
 
 /**
  * A small assistant that answers questions about Litmus.
@@ -86,10 +95,21 @@ export function HelpChat() {
   const [input, setInput] = useState("");
   // Blinks twice on mount (every page load), then rests once opened.
   const [blinking, setBlinking] = useState(true);
+  // Voice: whether replies are spoken, and whether the mic is listening.
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [listening, setListening] = useState(false);
+  // Support is detected on the client, so these start false and flip after
+  // mount — they must be state, not refs, or the buttons never appear.
+  const [canSpeak, setCanSpeak] = useState(false);
+  const [canListen, setCanListen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setBlinking(false), 2200);
+    const speakOk = speechSupported();
+    setCanSpeak(speakOk);
+    setCanListen(recognitionSupported());
+    if (speakOk) primeVoices();
     return () => clearTimeout(timer);
   }, []);
 
@@ -97,11 +117,45 @@ export function HelpChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
-  function ask(text: string) {
+  // Stop any speech when the panel closes.
+  useEffect(() => {
+    if (!open) cancelSpeech();
+  }, [open]);
+
+  function ask(text: string, spoken = false) {
     const q = text.trim();
     if (!q) return;
-    setMessages((m) => [...m, { role: "user", text: q }, { role: "bot", text: answer(q) }]);
+    const reply = answer(q);
+    setMessages((m) => [...m, { role: "user", text: q }, { role: "bot", text: reply }]);
     setInput("");
+    // Speak the reply if voice output is on, or if the question was spoken.
+    if ((voiceOn || spoken) && canSpeak) speak(reply);
+  }
+
+  function toggleVoice() {
+    setVoiceOn((on) => {
+      if (on) cancelSpeech();
+      return !on;
+    });
+  }
+
+  function startListening() {
+    if (listening) return;
+    const recognition = createRecognition();
+    if (!recognition) return;
+
+    // Talking to it implies wanting it to talk back.
+    if (!voiceOn) setVoiceOn(true);
+    setListening(true);
+    cancelSpeech();
+
+    recognition.onresult = (event: unknown) => {
+      const text = transcriptFrom(event);
+      if (text) ask(text, true);
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    recognition.start();
   }
 
   return (
@@ -114,8 +168,23 @@ export function HelpChat() {
             </span>
             <div className="leading-tight">
               <div className="text-[15px] font-bold">Ask about Litmus</div>
-              <div className="text-[12px] text-white/55">Answers from the report</div>
+              <div className="text-[12px] text-white/55">
+                {listening ? "Listening…" : voiceOn ? "Voice on" : "Answers from the report"}
+              </div>
             </div>
+            {canSpeak && (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                aria-label={voiceOn ? "Turn voice off" : "Turn voice on"}
+                aria-pressed={voiceOn}
+                className={`ml-auto flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                  voiceOn ? "bg-white text-ink" : "bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                {voiceOn ? <SpeakerIcon /> : <SpeakerMuteIcon />}
+              </button>
+            )}
           </div>
 
           <div ref={scrollRef} className="max-h-[46vh] min-h-[220px] space-y-3 overflow-y-auto px-5 py-5">
@@ -159,9 +228,23 @@ export function HelpChat() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask a question…"
+              placeholder={listening ? "Listening…" : "Ask a question…"}
               className="min-w-0 flex-1 rounded-full bg-mist px-4 py-2.5 text-[14px] text-ink outline-none placeholder:text-muted-light"
             />
+            {canListen && (
+              <button
+                type="button"
+                onClick={startListening}
+                aria-label="Speak your question"
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                  listening
+                    ? "listening-pulse border-bad bg-bad text-white"
+                    : "border-ink/12 text-muted hover:border-ink/30 hover:text-ink"
+                }`}
+              >
+                <MicIcon />
+              </button>
+            )}
             <button
               type="submit"
               aria-label="Send"
@@ -231,6 +314,50 @@ function SendIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M3.4 20.4 21 12 3.4 3.6 3 10l12 2-12 2z" />
+    </svg>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+      <path
+        d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SpeakerIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 9v6h3.5L13 20V4L7.5 9H4z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SpeakerMuteIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 9v6h3.5L13 20V4L7.5 9H4z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M17 9l4 4M21 9l-4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
   );
 }
